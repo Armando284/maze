@@ -1,5 +1,5 @@
 import type { GameState } from './game-state'
-import { CELL_SIZE, toPixel } from './grid'
+import { CELL_SIZE, toPixel, type Point } from './grid'
 import { MAZE_WIDTH, MAZE_HEIGHT, getCell } from './maze'
 import { Player } from './player'
 import { Enemy } from './enemy'
@@ -22,7 +22,7 @@ export class Renderer {
 		this.state = state
 	}
 
-	render(): void {
+	render(path: Point[]): void {
 		this.clear()
 
 		if (this.state.status === 'won') {
@@ -39,6 +39,7 @@ export class Renderer {
 		this.renderExit()
 		this.renderEnemy()
 		this.renderPlayer()
+		this.renderPath(path)
 	}
 
 	private clear(): void {
@@ -141,5 +142,20 @@ export class Renderer {
 		this.context.fillText('PRESS ENTER TO TRY AGAIN', 160, 115)
 
 		this.context.textAlign = 'left'
+	}
+
+	renderPath(path: Point[]): void {
+		this.context.fillStyle = '#444'
+
+		for (const point of path) {
+			const position = toPixel(point)
+
+			this.context.fillRect(
+				position.x + 3,
+				position.y + 3,
+				CELL_SIZE - 6,
+				CELL_SIZE - 6,
+			)
+		}
 	}
 }
