@@ -1,14 +1,18 @@
 import { Player } from './player'
 import { Renderer } from './renderer'
+import { type GameState } from './game-state'
 
 export class Game {
   private lastTime = 0
   private readonly player: Player
   private readonly renderer: Renderer;
+  private readonly state: GameState = {
+    status: 'playing',
+  }
 
   constructor(context: CanvasRenderingContext2D) {
     this.player = new Player();
-    this.renderer = new Renderer(context, this.player);
+    this.renderer = new Renderer(context, this.player, this.state);
 
     window.addEventListener('keydown', (event) => {
       this.handleInput(event);
@@ -35,6 +39,18 @@ export class Game {
   }
 
   private handleInput(event: KeyboardEvent): void {
+    if (
+      this.state.status === 'won' &&
+      event.key === 'Enter'
+    ) {
+      this.restart()
+      return
+    }
+
+    if (this.state.status !== 'playing') {
+      return
+    }
+
     switch (event.key) {
       case 'ArrowUp':
       case 'w':
@@ -60,5 +76,17 @@ export class Game {
         this.player.move({ x: 1, y: 0 })
         break
     }
+    this.checkVictory()
+  }
+
+  private checkVictory() {
+    if (this.player.isAtExit()) {
+      this.state.status = 'won'
+    }
+  }
+
+  private restart(): void {
+    this.state.status = 'playing'
+    this.player.reset()
   }
 }

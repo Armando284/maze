@@ -2,7 +2,12 @@ import { type Point, isInsideGrid } from './grid'
 import { MAZE } from './maze'
 
 export class Player {
-  position: Point = { x: 2, y: 2 }
+  private readonly startPosition: Point = {
+    x: 2,
+    y: 2,
+  }
+
+  position: Point = { ...this.startPosition }
 
   move(direction: Point): void {
     const newPosition: Point = {
@@ -23,5 +28,13 @@ export class Player {
     }
 
     return MAZE[position.y][position.x] !== '#'
+  }
+
+  isAtExit(): boolean {
+    return MAZE[this.position.y][this.position.x] === 'E'
+  }
+
+  reset(): void {
+    this.position = { ...this.startPosition }
   }
 }
