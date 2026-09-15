@@ -1,3 +1,6 @@
+import './style.css';
+import { Game } from './game';
+
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
 if (!canvas) {
   throw new Error('Canvas element not found');
@@ -11,9 +14,6 @@ if (!context) {
 canvas.width = 320
 canvas.height = 200
 
-context.fillStyle = '#000';
-context.fillRect(0, 0, canvas.width, canvas.height);
+const game = new Game(context);
 
-context.fillStyle = '#fff';
-context.font = '16px monospace';
-context.fillText('TALLERWEB MAZE', 90, 100);
+game.start();
