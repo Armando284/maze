@@ -31,6 +31,10 @@ export class Player {
 		return this.maze.isExit(this.position)
 	}
 
+	teleport(point: Point): void {
+		this.position = { ...point }
+	}
+
 	reset(): void {
 		this.position = { ...this.startPosition }
 	}

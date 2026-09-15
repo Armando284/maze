@@ -31,6 +31,7 @@ export interface GameState {
 	session: number
 	dots: number
 	fright: number
+	freeze: number
 	lives: number
 	invincible: number
 	flash: number

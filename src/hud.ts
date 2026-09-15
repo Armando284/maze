@@ -45,7 +45,11 @@ export class Hud {
 		this.session.textContent = String(state.session).padStart(2, '0')
 		this.bits.textContent = String(state.dots).padStart(3, '0')
 		this.fright.textContent =
-			state.fright > 0 ? `ANTIVIRUS ${Math.ceil(state.fright)}` : ''
+			state.fright > 0
+				? `ANTIVIRUS ${Math.ceil(state.fright)}`
+				: state.freeze > 0
+					? `FROZEN ${Math.ceil(state.freeze)}`
+					: ''
 		this.lives.textContent = '@'.repeat(Math.max(0, state.lives))
 		this.mute.textContent = state.muted ? 'MUTE' : ''
 		this.status.textContent =

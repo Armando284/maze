@@ -22,6 +22,10 @@ const SESSION_BONUS = 1000
 const HUNT_SESSION = 2
 const HUNTER_SESSION = 3
 const FRIGHT_DURATION = 8
+const FREEZE_DURATION = 5
+const EXTRA_LIFE_CAP = 6
+const COMBO_WINDOW = 1200
+const COMBO_MAX = 5
 const MAX_LIVES = 3
 const INVINCIBLE_DURATION = 2
 const FLASH_DURATION = 0.3
@@ -71,6 +75,7 @@ export class Game {
 		session: 1,
 		dots: 0,
 		fright: 0,
+		freeze: 0,
 		lives: MAX_LIVES,
 		invincible: 0,
 		flash: 0,
@@ -88,6 +93,8 @@ export class Game {
 		hsEntry: false,
 	}
 	private readonly enemyMinDistance = 12
+	private combo = 0
+	private comboTimer = 0
 	private get ghostMinDistance(): number {
 		return Math.max(6, 18 - (this.state.session - 1) * 2)
 	}
@@ -149,6 +156,7 @@ export class Game {
 		this.state.status = 'playing'
 		this.state.dots = this.maze.dotsRemaining
 		this.state.fright = 0
+		this.state.freeze = 0
 		this.state.invincible = 0
 		this.state.flash = 0
 		this.state.deathTimer = 0
@@ -156,6 +164,8 @@ export class Game {
 		this.state.hsEntry = false
 		this.state.popups.length = 0
 		this.state.particles.length = 0
+		this.combo = 0
+		this.comboTimer = 0
 	}
 
 	private spawnEnemies(): void {
@@ -291,10 +301,15 @@ export class Game {
 		this.agePopups(deltaTime)
 		this.ageParticles(deltaTime)
 
-		for (const enemy of this.enemies) {
-			enemy.update(deltaTime)
+		const frozen = this.state.freeze > 0
+
+		if (!frozen) {
+			for (const enemy of this.enemies) {
+				enemy.update(deltaTime)
+			}
+
+			this.ghost.update(deltaTime)
 		}
-		this.ghost.update(deltaTime)
 
 		if (this.checkVictory()) {
 			return
@@ -433,6 +448,13 @@ export class Game {
 		this.state.invincible = Math.max(0, this.state.invincible - deltaTime / 1000)
 		this.state.flash = Math.max(0, this.state.flash - deltaTime / 1000)
 		this.state.shake = Math.max(0, this.state.shake - deltaTime / 50)
+		this.state.freeze = Math.max(0, this.state.freeze - deltaTime / 1000)
+
+		this.comboTimer = Math.max(0, this.comboTimer - deltaTime)
+
+		if (this.comboTimer === 0) {
+			this.combo = 0
+		}
 	}
 
 	private updateFrightState(deltaTime: number): void {
@@ -673,6 +695,9 @@ export class Game {
 
 		this.collectBit(this.player.position)
 		this.collectPill(this.player.position)
+		this.collectFreezeAt(this.player.position)
+		this.collectExtraAt(this.player.position)
+		this.applyTeleport()
 	}
 
 	private collectBit(point: Point): void {
@@ -680,9 +705,57 @@ export class Game {
 			return
 		}
 
-		this.state.score += POINTS_PER_BIT
 		this.state.dots = this.maze.dotsRemaining
+
+		if (this.comboTimer > 0) {
+			this.combo = Math.min(COMBO_MAX, this.combo + 1)
+		} else {
+			this.combo = 1
+		}
+
+		this.comboTimer = COMBO_WINDOW
+
+		this.state.score += POINTS_PER_BIT * this.combo
 		this.audio.coin()
+
+		if (this.combo >= 3) {
+			this.addPopup(`x${this.combo}`, point.x, point.y - 1, '#ffaa33')
+		}
+	}
+
+	private collectFreezeAt(point: Point): void {
+		if (!this.maze.collectFreeze(point)) {
+			return
+		}
+
+		this.state.freeze = FREEZE_DURATION
+		this.audio.freeze()
+		this.addPopup('FROZEN', point.x, point.y, '#66ccff')
+		this.spawnBurst(point.x, point.y, '#66ccff', 10, 2.4, 2.5)
+	}
+
+	private collectExtraAt(point: Point): void {
+		if (!this.maze.collectExtra(point)) {
+			return
+		}
+
+		this.state.lives = Math.min(EXTRA_LIFE_CAP, this.state.lives + 1)
+		this.audio.life()
+		this.addPopup('1UP', point.x, point.y, '#ffcc33')
+		this.spawnBurst(point.x, point.y, '#ffcc33', 12, 2.4, 2.5)
+	}
+
+	private applyTeleport(): void {
+		const partner = this.maze.getTeleportPartner(this.player.position)
+
+		if (!partner) {
+			return
+		}
+
+		this.player.teleport(partner)
+		this.audio.warp()
+		this.addPopup('WARP', partner.x, partner.y, '#cc66ff')
+		this.spawnBurst(partner.x, partner.y, '#cc66ff', 10, 2.5, 2.5)
 	}
 
 	private collectPill(point: Point): void {

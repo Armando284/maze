@@ -11,6 +11,9 @@ const SYMBOLS = {
 	exit: 'E',
 	dot: '·',
 	pill: '+',
+	freeze: '*',
+	extra: '1',
+	teleport: 'T',
 	player: '@',
 	daemon: '&',
 	glitch: '?',
@@ -106,6 +109,7 @@ export class Renderer {
 		this.renderMaze()
 		this.renderBits()
 		this.renderPills()
+		this.renderSpecialCells()
 		this.renderExit()
 		this.renderDaemons()
 		this.renderGhost()
@@ -275,8 +279,41 @@ export class Renderer {
 		})
 	}
 
+	private renderSpecialCells(): void {
+		const blink = Math.floor(Date.now() / 350) % 2 === 0
+
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				const cell = this.maze.getCell({ x, y })
+
+				if (cell === 'freeze') {
+					this.withGlow(4, '#66ccff', () => {
+						this.context.fillStyle = blink ? '#66ccff' : '#2a4a5a'
+						this.renderCharacter(SYMBOLS.freeze, { x, y })
+					})
+				} else if (cell === 'extra') {
+					this.withGlow(4, '#ffcc33', () => {
+						this.context.fillStyle = blink ? '#ffcc33' : '#5a4a00'
+						this.renderCharacter(SYMBOLS.extra, { x, y })
+					})
+				} else if (cell === 'teleport') {
+					this.context.fillStyle = '#cc66ff'
+					this.renderCharacter(SYMBOLS.teleport, { x, y })
+				}
+			}
+		}
+	}
+
 	private renderDaemons(): void {
+		const frozen = this.state.freeze > 0
+
 		for (const enemy of this.enemies) {
+			if (frozen) {
+				this.context.fillStyle = '#5a6a7a'
+				this.renderCharacter(SYMBOLS.daemon, enemy.position)
+				continue
+			}
+
 			const color = enemy.scared
 				? '#00ddff'
 				: enemy.isHunter
@@ -292,6 +329,12 @@ export class Renderer {
 
 	private renderGhost(): void {
 		if (this.ghost.removed) {
+			return
+		}
+
+		if (this.state.freeze > 0) {
+			this.context.fillStyle = '#5a6a7a'
+			this.renderCharacter(SYMBOLS.glitch, this.ghost.position)
 			return
 		}
 
@@ -352,7 +395,7 @@ export class Renderer {
 		this.context.font = '12px monospace'
 		this.context.fillText('COLLECT ALL BITS OR REACH THE EXIT', 14, 84)
 		this.context.fillText('ANTIVIRUS (+) SCARES THE DAEMONS', 14, 102)
-		this.context.fillText('EAT SCARED DAEMON / GLITCH: +200 PTS', 14, 120)
+		this.context.fillText('* FREEZE // 1 EXTRA LIFE // T WARP', 14, 120)
 		this.context.fillText('SESSION 1 PATROL // HUNTING FROM S2', 14, 138)
 		this.context.fillText('HUNTER (ORANGE) APPEARS SESSION 3', 14, 156)
 

@@ -20,6 +20,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 | **6** | Soporte gamepad (d-pad + stick, A/Start confirman, B=pausa, Select=mute) | ✅ |
 | **7** | Attract mode: demo autoplay con bot (BFS a bits/píldoras/exit), contador en el título, "DEMO MODE" y corte con cualquier tecla | ✅ |
 | **8** | Enemigos y dificultad: sesión 1 patrullan (sin cazar), caza desde S2, **HUNTER** naranja y veloz desde S3 (+300), GLITCH empieza más cerca (S+), velocidad progresiva | ✅ |
+| **9** | Nuevas mecánicas: píldora **FREEZE** `*` (congela enemigos), **1UP** `1` (rara, +1 vida), **teletransportes** `T` (pares), combo de bits (×2..×5) | ✅ |
 
 ## Decisiones técnicas y convenciones
 
@@ -50,15 +51,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 
 ## Roadmap futuro
 
-Prioridad sugerida: 9 → 10 → 11 (11 también vale como pulido transversal).
-
-### Fase 9 — Nuevas mecánicas
-- **Píldora extra-vida** ocasional (rara, parpadea distinto) y píldora "OVERCLOCK"
-  que congela a los daemons unos segundos (en vez de asustarlos).
-- **Teletransportes** secretos en el laberinto (pares de tiles `T`).
-- Puntos por **combo**: recoger bits consecutivos sin frenar suma bonus.
-- Ficheros: `maze.ts` (nuevas células), `game.ts` (efectos), `renderer.ts` (símbolos).
-- Verificación: cada power-up altera el estado esperado y se cura del efecto.
+Prioridad sugerida: 10 → 11 (11 también vale como pulido transversal).
 
 ### Fase 10 — Pantalla de ayuda / opciones
 - Pantalla instrucciones accesible desde el título ("?"), selector de dificultad

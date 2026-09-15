@@ -1,7 +1,20 @@
 import type { Point } from './grid'
 import { DIRECTIONS, manhattanDistance, shuffle } from './grid'
 
-export type Cell = 'wall' | 'floor' | 'dot' | 'pill' | 'exit'
+export type Cell =
+	| 'wall'
+	| 'floor'
+	| 'dot'
+	| 'pill'
+	| 'freeze'
+	| 'extra'
+	| 'teleport'
+	| 'exit'
+
+export interface TeleportPair {
+	a: Point
+	b: Point
+}
 
 export const MAZE_WIDTH = 31
 export const MAZE_HEIGHT = 19
@@ -10,6 +23,7 @@ export class Maze {
 	private readonly cells: Cell[][]
 	private readonly loopDensity = 0.3
 	private dotCount = 0
+	readonly teleports: TeleportPair[] = []
 
 	constructor() {
 		this.cells = this.generate()
@@ -64,8 +78,77 @@ export class Maze {
 		cells[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'exit'
 
 		this.placePills(cells)
+		this.placePowerups(cells)
+		this.placeTeleports(cells)
 
 		return cells
+	}
+
+	private awayDots(cells: Cell[][], minStart: number): Point[] {
+		const candidates: Point[] = []
+		const start: Point = { x: 1, y: 1 }
+		const exit = this.exitPosition
+
+		for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+			for (let x = 1; x < MAZE_WIDTH - 1; x++) {
+				if (cells[y][x] !== 'dot') {
+					continue
+				}
+
+				const point = { x, y }
+
+				if (manhattanDistance(point, start) < minStart) {
+					continue
+				}
+
+				if (manhattanDistance(point, exit) < 4) {
+					continue
+				}
+
+				candidates.push(point)
+			}
+		}
+
+		return candidates
+	}
+
+	private placePowerups(cells: Cell[][]): void {
+		const picked = shuffle(this.awayDots(cells, 12))
+
+		if (picked[0]) {
+			cells[picked[0].y][picked[0].x] = 'freeze'
+		}
+
+		if (picked[1] && Math.random() < 0.5) {
+			cells[picked[1].y][picked[1].x] = 'extra'
+		}
+	}
+
+	private placeTeleports(cells: Cell[][]): void {
+		const candidates = this.awayDots(cells, 16)
+		const first = shuffle(candidates)[0]
+
+		if (!first) {
+			return
+		}
+
+const second = shuffle(candidates).find(
+			(point) =>
+				(point.x !== first.x || point.y !== first.y) &&
+				manhattanDistance(point, first) >= 12,
+		)
+
+		if (!second) {
+			return
+		}
+
+		cells[first.y][first.x] = 'teleport'
+		cells[second.y][second.x] = 'teleport'
+
+		this.teleports.push({
+			a: { ...first },
+			b: { ...second },
+		})
 	}
 
 	private placePills(cells: Cell[][]): void {
@@ -143,6 +226,40 @@ export class Maze {
 		this.cells[point.y][point.x] = 'floor'
 
 		return true
+	}
+
+	collectFreeze(point: Point): boolean {
+		if (this.cells[point.y][point.x] !== 'freeze') {
+			return false
+		}
+
+		this.cells[point.y][point.x] = 'floor'
+
+		return true
+	}
+
+	collectExtra(point: Point): boolean {
+		if (this.cells[point.y][point.x] !== 'extra') {
+			return false
+		}
+
+		this.cells[point.y][point.x] = 'floor'
+
+		return true
+	}
+
+	getTeleportPartner(point: Point): Point | null {
+		for (const pair of this.teleports) {
+			if (pair.a.x === point.x && pair.a.y === point.y) {
+				return { ...pair.b }
+			}
+
+			if (pair.b.x === point.x && pair.b.y === point.y) {
+				return { ...pair.a }
+			}
+		}
+
+		return null
 	}
 
 	get dotsRemaining(): number {

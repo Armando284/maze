@@ -174,6 +174,26 @@ export class Audio {
 		this.tone(440, 0.18, 0.14)
 	}
 
+	freeze(): void {
+		this.tone(660, 0.1)
+		this.tone(440, 0.1, 0.1)
+		this.tone(220, 0.22, 0.2)
+	}
+
+	life(): void {
+		this.tone(440, 0.08)
+		this.tone(554, 0.08, 0.08)
+		this.tone(659, 0.08, 0.16)
+		this.tone(880, 0.16, 0.24)
+	}
+
+	warp(): void {
+		this.tone(880, 0.1)
+		this.tone(660, 0.1, 0.08)
+		this.tone(440, 0.12, 0.16)
+		this.tone(880, 0.14, 0.28)
+	}
+
 	victory(): void {
 		const notes = [523.25, 659.25, 783.99, 1046.5]
 
