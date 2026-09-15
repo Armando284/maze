@@ -30,6 +30,11 @@ export class Renderer {
 			return
 		}
 
+		if (this.state.status === 'lost') {
+			this.renderGameOver()
+			return
+		}
+
 		this.renderMaze()
 		this.renderExit()
 		this.renderEnemy()
@@ -121,5 +126,20 @@ export class Renderer {
 			CELL_SIZE - 4,
 			CELL_SIZE - 4,
 		)
+	}
+
+	private renderGameOver(): void {
+		this.context.fillStyle = '#ff3333'
+		this.context.font = '20px monospace'
+		this.context.textAlign = 'center'
+
+		this.context.fillText('YOU WERE CAUGHT', 160, 90)
+
+		this.context.fillStyle = '#fff'
+		this.context.font = '10px monospace'
+
+		this.context.fillText('PRESS ENTER TO TRY AGAIN', 160, 115)
+
+		this.context.textAlign = 'left'
 	}
 }

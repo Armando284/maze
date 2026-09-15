@@ -60,4 +60,11 @@ export class Enemy {
 			y: Math.sign(dy),
 		}
 	}
+
+	isTouchingPlayer(): boolean {
+		return (
+			this.position.x === this.player.position.x &&
+			this.position.y === this.player.position.y
+		)
+	}
 }

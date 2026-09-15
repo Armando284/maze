@@ -45,12 +45,18 @@ export class Game {
 	}
 
 	private update(deltaTime: number): void {
-		void deltaTime
 		this.enemy.update(deltaTime)
+		if (this.checkVictory()) {
+			return
+		}
+
+		if (this.checkDefeat()) {
+			return
+		}
 	}
 
 	private handleInput(event: KeyboardEvent): void {
-		if (this.state.status === 'won' && event.key === 'Enter') {
+		if (this.state.status !== 'playing' && event.key === 'Enter') {
 			this.restart()
 			return
 		}
@@ -84,13 +90,22 @@ export class Game {
 				this.player.move({ x: 1, y: 0 })
 				break
 		}
-		this.checkVictory()
 	}
 
-	private checkVictory() {
+	private checkVictory(): boolean {
 		if (this.player.isAtExit()) {
 			this.state.status = 'won'
+			return true
 		}
+		return false
+	}
+
+	private checkDefeat(): boolean {
+		if (this.enemy.isTouchingPlayer()) {
+			this.state.status = 'lost'
+			return true
+		}
+		return false
 	}
 
 	private restart(): void {
