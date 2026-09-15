@@ -2,69 +2,158 @@ import type { Point } from './grid'
 
 export type Cell = 'wall' | 'floor' | 'exit'
 
-export const MAP = [
-  '################################',
-  '#                              #',
-  '#  #######  #######  #######  #',
-  '#  #                        #  #',
-  '#  #  ####################  #  #',
-  '#  #  #                  #  #  #',
-  '#  #  #  ##############  #  #  #',
-  '#  #  #  #            #  #  #  #',
-  '#     #  #     ##     #  #     #',
-  '##### #  #     ##     #  #######',
-  '#     #  #            #        #',
-  '#  ####  ##############  ####  #',
-  '#                             E#',
-  '#  ##########################  #',
-  '#                              #',
-  '#  #######  #######  #######   #',
-  '#  #                        #  #',
-  '#  #  ####################  #  #',
-  '#                              #',
-  '################################',
-] as const
-
-export const MAZE_WIDTH = MAP[0].length
-export const MAZE_HEIGHT = MAP.length
-
-export function getCell(x: number, y: number): Cell {
-  const value = MAP[y][x]
-
-  if (value === '#') {
-    return 'wall'
-  }
-
-  if (value === 'E') {
-    return 'exit'
-  }
-
-  return 'floor'
-}
+export const MAZE_WIDTH = 31
+export const MAZE_HEIGHT = 19
 
 export class Maze {
-  isInside(point: Point): boolean {
-    return (
-      point.x >= 0 &&
-      point.x < MAZE_WIDTH &&
-      point.y >= 0 &&
-      point.y < MAZE_HEIGHT
-    )
-  }
+	private readonly cells: Cell[][]
+	private readonly loopDensity = 0.3
 
-  isWalkable(point: Point): boolean {
-    if (!this.isInside(point)) {
-      return false
-    }
+	constructor() {
+		this.cells = this.generate()
+	}
 
-    return getCell(point.x, point.y) !== 'wall'
-  }
+	getCell(point: Point): Cell {
+		if (!this.isInside(point)) {
+			return 'wall'
+		}
 
-  isExit(point: Point): boolean {
-    if (!this.isInside(point)) {
-      return false
-    }
+		return this.cells[point.y][point.x]
+	}
 
-    return getCell(point.x, point.y) === 'exit'
-  }
+	isInside(point: Point): boolean {
+		return (
+			point.x >= 0 &&
+			point.x < MAZE_WIDTH &&
+			point.y >= 0 &&
+			point.y < MAZE_HEIGHT
+		)
+	}
+
+	isWalkable(point: Point): boolean {
+		return this.getCell(point) !== 'wall'
+	}
+
+	isExit(point: Point): boolean {
+		return this.getCell(point) === 'exit'
+	}
+
+	private generate(): Cell[][] {
+		const cells = Array.from({ length: MAZE_HEIGHT }, () =>
+			Array<Cell>(MAZE_WIDTH).fill('wall'),
+		)
+
+		const start: Point = {
+			x: 1,
+			y: 1,
+		}
+
+		cells[start.y][start.x] = 'floor'
+
+		this.carve(cells, start.x, start.y)
+
+		this.addLoops(cells)
+
+		cells[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'exit'
+
+		return cells
+	}
+
+	private carve(cells: Cell[][], x: number, y: number): void {
+		const directions = [
+			{ x: 0, y: -2 },
+			{ x: 2, y: 0 },
+			{ x: 0, y: 2 },
+			{ x: -2, y: 0 },
+		]
+
+		this.shuffle(directions)
+
+		for (const direction of directions) {
+			const nextX = x + direction.x
+			const nextY = y + direction.y
+
+			if (
+				nextX <= 0 ||
+				nextX >= MAZE_WIDTH - 1 ||
+				nextY <= 0 ||
+				nextY >= MAZE_HEIGHT - 1
+			) {
+				continue
+			}
+
+			if (cells[nextY][nextX] !== 'wall') {
+				continue
+			}
+
+			const middleX = x + direction.x / 2
+			const middleY = y + direction.y / 2
+
+			cells[middleY][middleX] = 'floor'
+			cells[nextY][nextX] = 'floor'
+
+			this.carve(cells, nextX, nextY)
+		}
+	}
+
+	private shuffle<T>(items: T[]): void {
+		for (let i = items.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1))
+
+			;[items[i], items[j]] = [items[j], items[i]]
+		}
+	}
+
+	findRandomFloor(): Point {
+		const floorCells: Point[] = []
+
+		for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+			for (let x = 1; x < MAZE_WIDTH - 1; x++) {
+				if (this.cells[y][x] === 'floor') {
+					floorCells.push({ x, y })
+				}
+			}
+		}
+
+		return floorCells[Math.floor(Math.random() * floorCells.length)]
+	}
+
+	get exitPosition(): Point {
+		return {
+			x: MAZE_WIDTH - 2,
+			y: MAZE_HEIGHT - 2,
+		}
+	}
+
+	private addLoops(cells: Cell[][]): void {
+		const candidates: Point[] = []
+
+		for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+			for (let x = 1; x < MAZE_WIDTH - 1; x++) {
+				if (cells[y][x] !== 'wall') {
+					continue
+				}
+
+				const horizontal =
+					cells[y][x - 1] === 'floor' && cells[y][x + 1] === 'floor'
+
+				const vertical =
+					cells[y - 1][x] === 'floor' && cells[y + 1][x] === 'floor'
+
+				if (horizontal || vertical) {
+					candidates.push({ x, y })
+				}
+			}
+		}
+
+		this.shuffle(candidates)
+
+		const amount = Math.floor(candidates.length * this.loopDensity)
+
+		for (let i = 0; i < amount; i++) {
+			const point = candidates[i]
+
+			cells[point.y][point.x] = 'floor'
+		}
+	}
 }

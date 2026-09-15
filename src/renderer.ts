@@ -1,6 +1,6 @@
 import type { GameState } from './game-state'
 import { CELL_SIZE, toPixel, type Point } from './grid'
-import { MAZE_WIDTH, MAZE_HEIGHT, getCell } from './maze'
+import { MAZE_WIDTH, MAZE_HEIGHT, Maze } from './maze'
 import { Player } from './player'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
@@ -11,15 +11,18 @@ export class Renderer {
 	private readonly state: GameState
 	private readonly enemy: Enemy
 	private readonly ghost: Ghost
+	private readonly maze: Maze
 
 	constructor(
 		context: CanvasRenderingContext2D,
+		maze: Maze,
 		player: Player,
 		enemy: Enemy,
 		ghost: Ghost,
 		state: GameState,
 	) {
 		this.context = context
+		this.maze = maze
 		this.player = player
 		this.enemy = enemy
 		this.ghost = ghost
@@ -54,7 +57,7 @@ export class Renderer {
 	private renderMaze(): void {
 		for (let y = 0; y < MAZE_HEIGHT; y++) {
 			for (let x = 0; x < MAZE_WIDTH; x++) {
-				const cell = getCell(x, y)
+				const cell = this.maze.getCell({ x, y })
 
 				if (cell === 'wall') {
 					this.renderWall(x, y)
@@ -84,26 +87,16 @@ export class Renderer {
 	}
 
 	private renderExit(): void {
-		for (let y = 0; y < MAZE_HEIGHT; y++) {
-			for (let x = 0; x < MAZE_WIDTH; x++) {
-				if (getCell(x, y) !== 'exit') {
-					continue
-				}
+		const position = toPixel(this.maze.exitPosition)
 
-				const position = toPixel({ x, y })
+		this.context.fillStyle = '#ffff00'
 
-				this.context.fillStyle = '#ffff00'
-
-				this.context.fillRect(
-					position.x + 2,
-					position.y + 2,
-					CELL_SIZE - 4,
-					CELL_SIZE - 4,
-				)
-
-				return
-			}
-		}
+		this.context.fillRect(
+			position.x + 2,
+			position.y + 2,
+			CELL_SIZE - 4,
+			CELL_SIZE - 4,
+		)
 	}
 
 	private renderVictory(): void {

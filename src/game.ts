@@ -4,37 +4,51 @@ import { type GameState } from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
+import type { Point } from './grid'
 
 export class Game {
+	private readonly context: CanvasRenderingContext2D
 	private lastTime = 0
-	private readonly player: Player
-	private readonly renderer: Renderer
 	private readonly state: GameState = {
 		status: 'playing',
 	}
-	private readonly maze: Maze
-	private readonly enemy: Enemy
-	private readonly ghost: Ghost
+	private maze!: Maze
+	private player!: Player
+	private enemy!: Enemy
+	private ghost!: Ghost
+	private renderer!: Renderer
 
 	constructor(context: CanvasRenderingContext2D) {
-		this.maze = new Maze()
-		this.player = new Player(this.maze)
-		this.enemy = new Enemy(this.maze, this.player, { x: 29, y: 17 })
-		this.ghost = new Ghost(this.player, {
-			x: 15,
-			y: 17,
+		this.context = context
+		this.createGame()
+		this.createRenderer()
+
+		window.addEventListener('keydown', (event) => {
+			this.handleInput(event)
 		})
+	}
+
+	private createGame(): void {
+		this.maze = new Maze()
+
+		this.player = new Player(this.maze)
+
+		this.enemy = new Enemy(this.maze, this.player, this.findEnemyStart())
+
+		this.ghost = new Ghost(this.player, this.findGhostStart())
+
+		this.state.status = 'playing'
+	}
+
+	private createRenderer(): void {
 		this.renderer = new Renderer(
-			context,
+			this.context,
+			this.maze,
 			this.player,
 			this.enemy,
 			this.ghost,
 			this.state,
 		)
-
-		window.addEventListener('keydown', (event) => {
-			this.handleInput(event)
-		})
 	}
 
 	start(): void {
@@ -118,7 +132,33 @@ export class Game {
 	}
 
 	private restart(): void {
-		this.state.status = 'playing'
-		this.player.reset()
+		this.createGame()
+		this.createRenderer()
+	}
+
+	private findEnemyStart(): Point {
+		let position = this.maze.findRandomFloor()
+
+		while (
+			position.x === this.player.position.x &&
+			position.y === this.player.position.y
+		) {
+			position = this.maze.findRandomFloor()
+		}
+
+		return position
+	}
+
+	private findGhostStart(): Point {
+		let position = this.maze.findRandomFloor()
+
+		while (
+			position.x === this.player.position.x &&
+			position.y === this.player.position.y
+		) {
+			position = this.maze.findRandomFloor()
+		}
+
+		return position
 	}
 }
