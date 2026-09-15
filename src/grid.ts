@@ -13,3 +13,12 @@ export function toPixel(point: Point): Point {
     y: point.y * CELL_SIZE,
   };
 }
+
+export function isInsideGrid(point: Point): boolean {
+  return (
+    point.x >= 0 &&
+    point.x < GRID_WIDTH &&
+    point.y >= 0 &&
+    point.y < GRID_HEIGHT
+  )
+}

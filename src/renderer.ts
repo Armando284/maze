@@ -5,18 +5,24 @@ import {
   toPixel,
 } from './grid'
 import { MAZE } from './maze'
+import { Player } from './player'
 
 export class Renderer {
   private readonly context: CanvasRenderingContext2D
+  private readonly player: Player
+
   constructor(
-    context: CanvasRenderingContext2D
+    context: CanvasRenderingContext2D,
+    player: Player
   ) {
     this.context = context
+    this.player = player
   }
 
   render(): void {
     this.clear()
     this.renderMaze()
+    this.renderPlayer()
   }
 
   private clear(): void {
@@ -43,5 +49,17 @@ export class Renderer {
         )
       }
     }
+  }
+
+  renderPlayer() {
+    const position = toPixel(this.player.position)
+
+    this.context.fillStyle = '#00ff66'
+    this.context.fillRect(
+      position.x + 2,
+      position.y + 2,
+      CELL_SIZE - 4,
+      CELL_SIZE - 4
+    )
   }
 }
