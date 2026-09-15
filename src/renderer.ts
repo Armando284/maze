@@ -22,7 +22,7 @@ export class Renderer {
 		this.state = state
 	}
 
-	render(path: Point[]): void {
+	render(): void {
 		this.clear()
 
 		if (this.state.status === 'won') {
@@ -39,7 +39,6 @@ export class Renderer {
 		this.renderExit()
 		this.renderEnemy()
 		this.renderPlayer()
-		this.renderPath(path)
 	}
 
 	private clear(): void {

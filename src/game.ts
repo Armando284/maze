@@ -3,7 +3,6 @@ import { Renderer } from './renderer'
 import { type GameState } from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
-import { Pathfinder } from './pathfinder'
 
 export class Game {
 	private lastTime = 0
@@ -14,12 +13,10 @@ export class Game {
 	}
 	private readonly maze: Maze
 	private readonly enemy: Enemy
-	private readonly pathfinder: Pathfinder
 	constructor(context: CanvasRenderingContext2D) {
 		this.maze = new Maze()
 		this.player = new Player(this.maze)
-		this.enemy = new Enemy(this.maze, this.player, { x: 28, y: 17 })
-		this.pathfinder = new Pathfinder(this.maze)
+		this.enemy = new Enemy(this.maze, this.player, { x: 29, y: 17 })
 		this.renderer = new Renderer(
 			context,
 			this.player,
@@ -48,13 +45,7 @@ export class Game {
 	private update(deltaTime: number): void {
 		this.enemy.update(deltaTime)
 
-		const path = this.pathfinder.findPath(
-			this.enemy.position,
-			this.player.position,
-		)
-
-		console.log('Enemy path:', path)
-		this.renderer.render(path)
+		this.renderer.render()
 
 		if (this.checkVictory()) {
 			return
