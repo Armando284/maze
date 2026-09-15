@@ -4,11 +4,15 @@ import { Maze } from './maze'
 import { Player } from './player'
 import { Pathfinder } from './pathfinder'
 
+export type EnemyBehavior = 'patrol' | 'hunt'
+
 export class Enemy {
 	position: Point
 	scared = false
+	isHunter = false
 	private readonly player: Player
 	private readonly moveInterval: number
+	private readonly behavior: EnemyBehavior
 	private moveTimer = 0
 	private readonly pathfinder: Pathfinder
 	private readonly maze: Maze
@@ -18,10 +22,14 @@ export class Enemy {
 		player: Player,
 		startPosition: Point,
 		moveInterval: number,
+		behavior: EnemyBehavior = 'hunt',
+		isHunter = false,
 	) {
 		this.player = player
 		this.maze = maze
 		this.moveInterval = moveInterval
+		this.behavior = behavior
+		this.isHunter = isHunter
 		this.pathfinder = new Pathfinder((position: Point) =>
 			maze.isWalkable(position),
 		)
@@ -31,7 +39,10 @@ export class Enemy {
 	update(deltaTime: number): void {
 		this.moveTimer += deltaTime
 
-		const interval = this.scared ? this.moveInterval * 1.6 : this.moveInterval
+		const interval =
+			this.scared || this.behavior === 'patrol'
+				? this.moveInterval * 1.6
+				: this.moveInterval
 
 		if (this.moveTimer < interval) {
 			return
@@ -39,7 +50,7 @@ export class Enemy {
 
 		this.moveTimer = 0
 
-		if (this.scared) {
+		if (this.scared || this.behavior === 'patrol') {
 			this.wander()
 			return
 		}

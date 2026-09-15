@@ -277,7 +277,11 @@ export class Renderer {
 
 	private renderDaemons(): void {
 		for (const enemy of this.enemies) {
-			const color = enemy.scared ? '#00ddff' : '#ff3333'
+			const color = enemy.scared
+				? '#00ddff'
+				: enemy.isHunter
+					? '#ff8833'
+					: '#ff3333'
 
 			this.withGlow(4, color, () => {
 				this.context.fillStyle = color
@@ -349,7 +353,8 @@ export class Renderer {
 		this.context.fillText('COLLECT ALL BITS OR REACH THE EXIT', 14, 84)
 		this.context.fillText('ANTIVIRUS (+) SCARES THE DAEMONS', 14, 102)
 		this.context.fillText('EAT SCARED DAEMON / GLITCH: +200 PTS', 14, 120)
-		this.context.fillText('3 LIVES PER SESSION. DONT GET CAUGHT', 14, 138)
+		this.context.fillText('SESSION 1 PATROL // HUNTING FROM S2', 14, 138)
+		this.context.fillText('HUNTER (ORANGE) APPEARS SESSION 3', 14, 156)
 
 		this.context.fillStyle = prompt ? '#33ff66' : '#0a3d17'
 		this.context.font = '14px monospace'
@@ -357,17 +362,17 @@ export class Renderer {
 
 		this.context.fillStyle = '#5a7a5a'
 		this.context.font = '10px monospace'
-		this.context.fillText('P PAUSE // M MUTE // PAD A/B', 14, 194)
+		this.context.fillText('P PAUSE // M MUTE // PAD A/B', 14, 192)
 
 		const secondsLeft = Math.max(0, Math.ceil(DEMO_DELAY - this.state.demoTimer))
 		const idle = Math.floor(Date.now() / 500) % 2 === 0
 
 		this.context.fillStyle = idle ? '#5a7a5a' : '#2a3a2a'
-		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 206)
+		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 202)
 
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
-		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 216)
+		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 212)
 	}
 
 	private renderVictory(): void {

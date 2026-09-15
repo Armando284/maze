@@ -19,6 +19,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 | **5** | Partículas, screen shake, glow neón (`shadowBlur`), secuencia de muerte con retardo ("SYSTEM FAILURE") | ✅ |
 | **6** | Soporte gamepad (d-pad + stick, A/Start confirman, B=pausa, Select=mute) | ✅ |
 | **7** | Attract mode: demo autoplay con bot (BFS a bits/píldoras/exit), contador en el título, "DEMO MODE" y corte con cualquier tecla | ✅ |
+| **8** | Enemigos y dificultad: sesión 1 patrullan (sin cazar), caza desde S2, **HUNTER** naranja y veloz desde S3 (+300), GLITCH empieza más cerca (S+), velocidad progresiva | ✅ |
 
 ## Decisiones técnicas y convenciones
 
@@ -49,15 +50,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 
 ## Roadmap futuro
 
-Prioridad sugerida: 8 → 9 → 10 → 11 (11 también vale como pulido transversal).
-
-### Fase 8 — Más variedad de enemigos y dificultad dinámica
-- Un **HUNTER** que persigue más agresivo (replanificación más frecuente,
-  velocidad mayor) aparece desde sesión 3.
-- El **GLITCH** se divide o acelera según sesión; los daemons ganan velocidad
-  progresivamente. Comportamientos distintos por sesión (wander → patrulla → caza).
-- Ficheros: `enemy.ts`, `ghost.ts`, `game.ts` (spawn y parámetros por sesión).
-- Verificación: en sesiones altas la presión sube de forma perceptible pero justa.
+Prioridad sugerida: 9 → 10 → 11 (11 también vale como pulido transversal).
 
 ### Fase 9 — Nuevas mecánicas
 - **Píldora extra-vida** ocasional (rara, parpadea distinto) y píldora "OVERCLOCK"

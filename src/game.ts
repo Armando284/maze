@@ -5,7 +5,7 @@ import {
 	type ScoreEntry,
 } from './game-state'
 import { Maze } from './maze'
-import { Enemy } from './enemy'
+import { Enemy, type EnemyBehavior } from './enemy'
 import { Ghost } from './ghost'
 import { Audio } from './audio'
 import { Hud } from './hud'
@@ -17,7 +17,10 @@ const PLAYER_MOVE_INTERVAL = 110
 const POINTS_PER_BIT = 10
 const PILL_BONUS = 50
 const SLAY_BONUS = 200
+const HUNTER_BONUS = 300
 const SESSION_BONUS = 1000
+const HUNT_SESSION = 2
+const HUNTER_SESSION = 3
 const FRIGHT_DURATION = 8
 const MAX_LIVES = 3
 const INVINCIBLE_DURATION = 2
@@ -85,7 +88,9 @@ export class Game {
 		hsEntry: false,
 	}
 	private readonly enemyMinDistance = 12
-	private readonly ghostMinDistance = 18
+	private get ghostMinDistance(): number {
+		return Math.max(6, 18 - (this.state.session - 1) * 2)
+	}
 
 	private maze!: Maze
 	private player!: Player
@@ -158,10 +163,22 @@ export class Game {
 
 		this.enemies.length = 0
 		this.enemies.push(
-			...starts.map(
-				(start) =>
-					new Enemy(this.maze, this.player, start, this.enemyInterval),
-			),
+			...starts.map((start, index) => {
+				const isHunter =
+					this.state.session >= HUNTER_SESSION && index === 0
+				const behavior: EnemyBehavior =
+					this.state.session >= HUNT_SESSION ? 'hunt' : 'patrol'
+				const interval = isHunter ? this.hunterInterval : this.enemyInterval
+
+				return new Enemy(
+					this.maze,
+					this.player,
+					start,
+					interval,
+					behavior,
+					isHunter,
+				)
+			}),
 		)
 	}
 
@@ -785,19 +802,21 @@ export class Game {
 
 		for (const enemy of this.enemies) {
 			if (enemy.scared && enemy.isTouchingPlayer()) {
-				this.state.score += SLAY_BONUS
+				const bonus = enemy.isHunter ? HUNTER_BONUS : SLAY_BONUS
+
+				this.state.score += bonus
 				this.state.shake = 3
 				this.audio.slay()
 				this.addPopup(
-					'+200',
+					`+${bonus}`,
 					enemy.position.x,
 					enemy.position.y,
-					'#ffcc33',
+					enemy.isHunter ? '#ff8833' : '#ffcc33',
 				)
 				this.spawnBurst(
 					enemy.position.x,
 					enemy.position.y,
-					'#ffcc33',
+					enemy.isHunter ? '#ff8833' : '#ffcc33',
 					14,
 					3,
 					2.5,
@@ -949,6 +968,10 @@ export class Game {
 
 	private get enemyInterval(): number {
 		return Math.max(140, 260 - (this.state.session - 1) * 20)
+	}
+
+	private get hunterInterval(): number {
+		return Math.max(90, Math.floor(this.enemyInterval * 0.7))
 	}
 
 	private get ghostInterval(): number {
