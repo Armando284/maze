@@ -1,5 +1,4 @@
 import type { Point } from './grid'
-import { Maze } from './maze'
 
 interface Node {
 	position: Point
@@ -13,18 +12,20 @@ const DIRECTIONS: Point[] = [
 	{ x: -1, y: 0 },
 ]
 
+export type CanMove = (position: Point) => boolean
+
 export class Pathfinder {
-	private readonly maze: Maze
-	constructor(maze: Maze) {
-		this.maze = maze
+	private readonly canMove: CanMove
+	constructor(canMove: CanMove) {
+		this.canMove = canMove
 	}
 
 	findPath(start: Point, target: Point): Point[] {
-		if (!this.maze.isWalkable(start)) {
+		if (!this.canMove(start)) {
 			return []
 		}
 
-		if (!this.maze.isWalkable(target)) {
+		if (!this.canMove(target)) {
 			return []
 		}
 
@@ -61,7 +62,7 @@ export class Pathfinder {
 
 				const key = this.key(nextPosition)
 
-				if (!this.maze.isWalkable(nextPosition) || visited.has(key)) {
+				if (!this.canMove(nextPosition) || visited.has(key)) {
 					continue
 				}
 

@@ -1,21 +1,21 @@
 import type { Point } from './grid'
-import { Maze } from './maze'
-import { Player } from './player'
+import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
 import { Pathfinder } from './pathfinder'
+import { Player } from './player'
 
-export class Enemy {
+export class Ghost {
 	position: Point
-	private readonly player: Player
-	private readonly moveInterval: number = 250
-	private moveTimer: number = 0
-	private readonly pathfinder: Pathfinder
 
-	constructor(maze: Maze, player: Player, startPosition: Point) {
-		this.player = player
-		this.pathfinder = new Pathfinder((position: Point) =>
-			maze.isWalkable(position),
-		)
+	private readonly moveInterval = 500
+	private moveTimer = 0
+
+	private readonly pathfinder: Pathfinder
+	private readonly player: Player
+
+	constructor(player: Player, startPosition: Point) {
 		this.position = { ...startPosition }
+		this.player = player
+		this.pathfinder = new Pathfinder((position) => this.canMove(position))
 	}
 
 	update(deltaTime: number): void {
@@ -43,6 +43,15 @@ export class Enemy {
 		return (
 			this.position.x === this.player.position.x &&
 			this.position.y === this.player.position.y
+		)
+	}
+
+	private canMove(position: Point): boolean {
+		return (
+			position.x >= 0 &&
+			position.x < MAZE_WIDTH &&
+			position.y >= 0 &&
+			position.y < MAZE_HEIGHT
 		)
 	}
 }

@@ -3,22 +3,26 @@ import { CELL_SIZE, toPixel, type Point } from './grid'
 import { MAZE_WIDTH, MAZE_HEIGHT, getCell } from './maze'
 import { Player } from './player'
 import { Enemy } from './enemy'
+import { Ghost } from './ghost'
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
 	private readonly player: Player
 	private readonly state: GameState
 	private readonly enemy: Enemy
+	private readonly ghost: Ghost
 
 	constructor(
 		context: CanvasRenderingContext2D,
 		player: Player,
 		enemy: Enemy,
+		ghost: Ghost,
 		state: GameState,
 	) {
 		this.context = context
 		this.player = player
 		this.enemy = enemy
+		this.ghost = ghost
 		this.state = state
 	}
 
@@ -38,6 +42,7 @@ export class Renderer {
 		this.renderMaze()
 		this.renderExit()
 		this.renderEnemy()
+		this.renderGhost()
 		this.renderPlayer()
 	}
 
@@ -156,5 +161,18 @@ export class Renderer {
 				CELL_SIZE - 6,
 			)
 		}
+	}
+
+	private renderGhost(): void {
+		const position = toPixel(this.ghost.position)
+
+		this.context.fillStyle = '#cc66ff'
+
+		this.context.fillRect(
+			position.x + 2,
+			position.y + 2,
+			CELL_SIZE - 4,
+			CELL_SIZE - 4,
+		)
 	}
 }

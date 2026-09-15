@@ -3,6 +3,7 @@ import { Renderer } from './renderer'
 import { type GameState } from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
+import { Ghost } from './ghost'
 
 export class Game {
 	private lastTime = 0
@@ -13,14 +14,21 @@ export class Game {
 	}
 	private readonly maze: Maze
 	private readonly enemy: Enemy
+	private readonly ghost: Ghost
+
 	constructor(context: CanvasRenderingContext2D) {
 		this.maze = new Maze()
 		this.player = new Player(this.maze)
 		this.enemy = new Enemy(this.maze, this.player, { x: 29, y: 17 })
+		this.ghost = new Ghost(this.player, {
+			x: 15,
+			y: 17,
+		})
 		this.renderer = new Renderer(
 			context,
 			this.player,
 			this.enemy,
+			this.ghost,
 			this.state,
 		)
 
@@ -38,14 +46,14 @@ export class Game {
 		this.lastTime = time
 
 		this.update(deltaTime)
+		this.renderer.render()
 
 		requestAnimationFrame((nextTime) => this.loop(nextTime))
 	}
 
 	private update(deltaTime: number): void {
 		this.enemy.update(deltaTime)
-
-		this.renderer.render()
+		this.ghost.update(deltaTime)
 
 		if (this.checkVictory()) {
 			return
@@ -102,7 +110,7 @@ export class Game {
 	}
 
 	private checkDefeat(): boolean {
-		if (this.enemy.isTouchingPlayer()) {
+		if (this.enemy.isTouchingPlayer() || this.ghost.isTouchingPlayer()) {
 			this.state.status = 'lost'
 			return true
 		}
