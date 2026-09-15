@@ -169,7 +169,11 @@ export class Renderer {
 
 		this.context.fillStyle = '#fff'
 		this.context.font = '10px monospace'
-		this.context.fillText('PRESS P TO RESUME   //   M TO MUTE', CANVAS_WIDTH / 2, 132)
+		this.context.fillText(
+			'P RESUME // M MUTE // PAD B RESUME',
+			CANVAS_WIDTH / 2,
+			132,
+		)
 
 		this.context.textAlign = 'left'
 	}
@@ -337,7 +341,7 @@ export class Renderer {
 
 		this.context.fillStyle = '#5a7a5a'
 		this.context.font = '10px monospace'
-		this.context.fillText('P PAUSE   //   M MUTE', 14, 194)
+		this.context.fillText('P PAUSE // M MUTE // PAD A/B', 14, 194)
 
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'

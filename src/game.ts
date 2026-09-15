@@ -9,6 +9,7 @@ import { Enemy } from './enemy'
 import { Ghost } from './ghost'
 import { Audio } from './audio'
 import { Hud } from './hud'
+import { GamepadInput } from './gamepad'
 import { type Point, manhattanDistance } from './grid'
 
 const PLAYER_MOVE_INTERVAL = 110
@@ -56,6 +57,7 @@ export class Game {
 	private readonly pressOrder: string[] = []
 	private readonly audio = new Audio()
 	private readonly hud = new Hud()
+	private readonly gamepad: GamepadInput
 	private readonly state: GameState = {
 		status: 'title',
 		score: 0,
@@ -101,6 +103,15 @@ export class Game {
 		window.addEventListener('keyup', (event) => {
 			this.handleKeyUp(event)
 		})
+
+		this.gamepad = new GamepadInput(
+			(key) => this.simulateKey('keydown', key),
+			(key) => this.simulateKey('keyup', key),
+		)
+	}
+
+	private simulateKey(type: 'keydown' | 'keyup', key: string): void {
+		window.dispatchEvent(new KeyboardEvent(type, { key }))
 	}
 
 	unlockAudio(): void {
@@ -176,6 +187,7 @@ export class Game {
 		const deltaTime = time - this.lastTime
 		this.lastTime = time
 
+		this.gamepad.update()
 		this.update(deltaTime)
 		this.renderer.render()
 		this.hud.update(this.state)
