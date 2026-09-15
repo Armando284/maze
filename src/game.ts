@@ -1,8 +1,11 @@
+import { Renderer } from './renderer'
+
 export class Game {
   private lastTime = 0
-  private readonly context: CanvasRenderingContext2D;
+  private readonly renderer: Renderer;
+
   constructor(context: CanvasRenderingContext2D) {
-    this.context = context;
+    this.renderer = new Renderer(context);
   }
 
   start(): void {
@@ -14,7 +17,7 @@ export class Game {
     this.lastTime = time;
 
     this.update(deltaTime);
-    this.render();
+    this.renderer.render();
 
     requestAnimationFrame((nextTime) => this.loop(nextTime));
   }
@@ -22,18 +25,5 @@ export class Game {
   private update(deltaTime: number): void {
     // TODO: Implement game update logic here
     void deltaTime; // Placeholder to avoid unused variable warning
-  }
-
-  private render(): void {
-    this.context.fillStyle = '#000';
-    this.context.fillRect(0, 0, this.context.canvas.width, this.context.canvas.height);
-
-    this.context.fillStyle = '#fff';
-    this.context.font = '16px monospace';
-    this.context.fillText('TALLERWEB MAZE', 90, 100);
-
-    const fps = Math.round(1000 / (this.lastTime || 1));
-
-    this.context.fillText(`FPS: ${fps}`, 10, 20);
   }
 }
