@@ -10,6 +10,7 @@ import { Ghost } from './ghost'
 import { Audio } from './audio'
 import { Hud } from './hud'
 import { GamepadInput } from './gamepad'
+import { Pathfinder } from './pathfinder'
 import { type Point, manhattanDistance } from './grid'
 
 const PLAYER_MOVE_INTERVAL = 110
@@ -25,6 +26,8 @@ const INTRO_DURATION = 1.4
 const POPUP_LIFE = 0.9
 const DEATH_DURATION = 0.9
 const SHAKE_MAX = 10
+const DEMO_DELAY = 12
+const DEMO_RESULT_DELAY = 4
 const MAX_SCORES = 5
 const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
@@ -72,6 +75,8 @@ export class Game {
 		introTimer: 0,
 		deathTimer: 0,
 		shake: 0,
+		demo: false,
+		demoTimer: 0,
 		popups: [],
 		particles: [],
 		scores: this.loadScores(),
@@ -87,6 +92,7 @@ export class Game {
 	private enemies: Enemy[] = []
 	private ghost!: Ghost
 	private renderer!: Renderer
+	private botPathfinder: Pathfinder | null = null
 
 	constructor(context: CanvasRenderingContext2D) {
 		this.context = context
@@ -202,7 +208,34 @@ export class Game {
 			return
 		}
 
+		if (this.state.status === 'title') {
+			if (!this.state.demo) {
+				this.state.demoTimer += deltaTime / 1000
+
+				if (this.state.demoTimer >= DEMO_DELAY) {
+					this.startDemo()
+				}
+			}
+			this.updateHiScore()
+			return
+		}
+
 		if (this.state.status !== 'playing') {
+			if (
+				this.state.demo &&
+				(this.state.status === 'won' || this.state.status === 'gameover')
+			) {
+				this.state.demoTimer -= deltaTime / 1000
+
+				if (this.state.demoTimer <= 0) {
+					if (this.state.status === 'won') {
+						this.state.demoTimer = 0
+						this.nextSession()
+					} else {
+						this.endDemo()
+					}
+				}
+			}
 			this.updateHiScore()
 			return
 		}
@@ -232,6 +265,9 @@ export class Game {
 			return
 		}
 
+		if (this.state.demo) {
+			this.botTick()
+		}
 		this.updatePlayer(deltaTime)
 		this.updateFrightState(deltaTime)
 		this.updateTimers(deltaTime)
@@ -252,6 +288,57 @@ export class Game {
 		}
 
 		this.updateHiScore()
+	}
+
+	private startDemo(): void {
+		this.state.demo = true
+		this.state.demoTimer = 0
+		this.state.session = 1
+		this.state.score = 0
+		this.state.lives = MAX_LIVES
+		this.botPathfinder = new Pathfinder((position) =>
+			this.maze.isWalkable(position),
+		)
+		this.createGame()
+		this.createRenderer()
+		this.state.introTimer = 0
+		this.audio.startMusic()
+	}
+
+	private endDemo(): void {
+		this.state.demo = false
+		this.state.demoTimer = 0
+		this.state.status = 'title'
+	}
+
+	private botTick(): void {
+		const pathfinder = this.botPathfinder
+
+		if (!pathfinder) {
+			return
+		}
+
+		const collectable = this.maze.findNearestCollectable(this.player.position)
+		const target = collectable ?? this.maze.exitPosition
+		const path = pathfinder.findPath(this.player.position, target)
+
+		if (path.length < 2) {
+			return
+		}
+
+		const step = {
+			x: path[1].x - path[0].x,
+			y: path[1].y - path[0].y,
+		}
+		const key = directionKey(step)
+
+		if (!key || this.pressOrder[this.pressOrder.length - 1] === key) {
+			return
+		}
+
+		this.heldKeys.clear()
+		this.pressOrder.length = 0
+		this.pressOrder.push(key)
 	}
 
 	private agePopups(deltaTime: number): void {
@@ -385,6 +472,15 @@ export class Game {
 
 		if (event.key === 'm' || event.key === 'M') {
 			this.toggleMute()
+			return
+		}
+
+		if (this.state.demo) {
+			this.endDemo()
+
+			if (isActionKey(event.key)) {
+				this.newGame()
+			}
 			return
 		}
 
@@ -594,6 +690,11 @@ export class Game {
 
 		if (this.player.isAtExit() || allBitsCollected) {
 			this.state.status = 'won'
+
+			if (this.state.demo) {
+				this.state.demoTimer = DEMO_RESULT_DELAY
+			}
+
 			this.state.score += SESSION_BONUS
 			this.addPopup(
 				'+1000',
@@ -660,6 +761,13 @@ export class Game {
 
 	private gameOver(): void {
 		this.state.status = 'gameover'
+
+		if (this.state.demo) {
+			this.state.demoTimer = DEMO_RESULT_DELAY
+			this.updateHiScore()
+			return
+		}
+
 		this.audio.stopMusic()
 		this.audio.death()
 
@@ -753,6 +861,10 @@ export class Game {
 	}
 
 	private updateHiScore(): void {
+		if (this.state.demo) {
+			return
+		}
+
 		if (this.state.score <= this.state.hiScore) {
 			return
 		}
@@ -920,6 +1032,26 @@ export class Game {
 
 function isActionKey(key: string): boolean {
 	return key === 'Enter' || key === ' '
+}
+
+function directionKey(direction: Point): string | null {
+	if (direction.x === 0 && direction.y === -1) {
+		return 'ArrowUp'
+	}
+
+	if (direction.x === 0 && direction.y === 1) {
+		return 'ArrowDown'
+	}
+
+	if (direction.x === -1 && direction.y === 0) {
+		return 'ArrowLeft'
+	}
+
+	if (direction.x === 1 && direction.y === 0) {
+		return 'ArrowRight'
+	}
+
+	return null
 }
 
 function isScoreEntry(value: unknown): value is ScoreEntry {

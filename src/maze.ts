@@ -1,5 +1,5 @@
 import type { Point } from './grid'
-import { manhattanDistance, shuffle } from './grid'
+import { DIRECTIONS, manhattanDistance, shuffle } from './grid'
 
 export type Cell = 'wall' | 'floor' | 'dot' | 'pill' | 'exit'
 
@@ -147,6 +147,48 @@ export class Maze {
 
 	get dotsRemaining(): number {
 		return this.dotCount
+	}
+
+	findNearestCollectable(from: Point): Point | null {
+		const queue: Point[] = [from]
+		const visited = new Set<string>([`${from.x},${from.y}`])
+
+		while (queue.length > 0) {
+			const current = queue.shift()
+
+			if (!current) {
+				break
+			}
+
+			for (const direction of DIRECTIONS) {
+				const next = {
+					x: current.x + direction.x,
+					y: current.y + direction.y,
+				}
+
+				if (!this.isWalkable(next)) {
+					continue
+				}
+
+				const key = `${next.x},${next.y}`
+
+				if (visited.has(key)) {
+					continue
+				}
+
+				visited.add(key)
+
+				const cell = this.cells[next.y][next.x]
+
+				if (cell === 'dot' || cell === 'pill') {
+					return next
+				}
+
+				queue.push(next)
+			}
+		}
+
+		return null
 	}
 
 	private carve(cells: Cell[][], x: number, y: number): void {

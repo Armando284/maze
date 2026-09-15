@@ -38,6 +38,8 @@ export interface GameState {
 	introTimer: number
 	deathTimer: number
 	shake: number
+	demo: boolean
+	demoTimer: number
 	popups: Popup[]
 	particles: Particle[]
 	scores: ScoreEntry[]

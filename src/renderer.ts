@@ -17,6 +17,7 @@ const SYMBOLS = {
 } as const
 
 const POPUP_LIFE = 0.9
+const DEMO_DELAY = 12
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
@@ -50,27 +51,42 @@ export class Renderer {
 				this.renderTitle()
 				return
 
-			case 'won':
-				this.renderVictory()
-				return
-
-			case 'gameover':
-				this.renderGameOver()
-				return
-
 			case 'paused':
 				this.renderGame()
 				this.renderPauseOverlay()
-				return
 
-			case 'playing':
-				this.renderGame()
-
-				if (this.state.introTimer > 0) {
-					this.renderIntro()
+				if (this.state.demo) {
+					this.drawDemoLabel()
 				}
 				return
 		}
+
+		if (this.state.status === 'won') {
+			this.renderVictory()
+		} else if (this.state.status === 'gameover') {
+			this.renderGameOver()
+		} else if (this.state.status === 'playing') {
+			this.renderGame()
+
+			if (this.state.introTimer > 0) {
+				this.renderIntro()
+			}
+		}
+
+		if (this.state.demo) {
+			this.drawDemoLabel()
+		}
+	}
+
+	private drawDemoLabel(): void {
+		const blink = Math.floor(Date.now() / 400) % 2 === 0
+
+		this.context.textAlign = 'left'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = blink ? '#ffcc33' : '#5a3a00'
+		this.context.font = '10px monospace'
+		this.context.fillText('DEMO MODE // PRESS ANY KEY', 14, CANVAS_HEIGHT - 16)
 	}
 
 	private renderGame(): void {
@@ -343,6 +359,12 @@ export class Renderer {
 		this.context.font = '10px monospace'
 		this.context.fillText('P PAUSE // M MUTE // PAD A/B', 14, 194)
 
+		const secondsLeft = Math.max(0, Math.ceil(DEMO_DELAY - this.state.demoTimer))
+		const idle = Math.floor(Date.now() / 500) % 2 === 0
+
+		this.context.fillStyle = idle ? '#5a7a5a' : '#2a3a2a'
+		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 206)
+
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
 		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 216)
@@ -364,11 +386,13 @@ export class Renderer {
 			106,
 		)
 
-		this.context.fillText(
-			'PRESS ENTER FOR NEXT SESSION',
-			Math.abs(CANVAS_WIDTH / 2),
-			124,
-		)
+		if (!this.state.demo) {
+			this.context.fillText(
+				'PRESS ENTER FOR NEXT SESSION',
+				Math.abs(CANVAS_WIDTH / 2),
+				124,
+			)
+		}
 
 		this.context.textAlign = 'left'
 	}
@@ -405,7 +429,7 @@ export class Renderer {
 
 				this.context.fillText(character, 14 + i * 26, y)
 			}
-		} else {
+		} else if (!this.state.demo) {
 			this.context.fillStyle = '#5a7a5a'
 			this.context.font = '10px monospace'
 			this.context.fillText('PRESS ENTER FOR TITLES', 14, y)
