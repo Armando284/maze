@@ -1,19 +1,24 @@
-import './style.css';
-import { Game } from './game';
+import './style.css'
+import { Game } from './game'
+import { CELL_SIZE } from './grid'
+import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
 
-const canvas = document.querySelector<HTMLCanvasElement>('#game');
+const canvas = document.querySelector<HTMLCanvasElement>('#game')
 if (!canvas) {
-  throw new Error('Canvas element not found');
+	throw new Error('Canvas element not found')
 }
 
-const context = canvas.getContext('2d');
+const context = canvas.getContext('2d')
 if (!context) {
-  throw new Error('Failed to get 2D context');
+	throw new Error('Failed to get 2D context')
 }
 
-canvas.width = 320
-canvas.height = 200
+export const CANVAS_WIDTH = MAZE_WIDTH * CELL_SIZE
+export const CANVAS_HEIGHT = MAZE_HEIGHT * CELL_SIZE
 
-const game = new Game(context);
+canvas.width = CANVAS_WIDTH
+canvas.height = CANVAS_HEIGHT
 
-game.start();
+const game = new Game(context)
+
+game.start()

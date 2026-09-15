@@ -4,6 +4,15 @@ import { MAZE_WIDTH, MAZE_HEIGHT, Maze } from './maze'
 import { Player } from './player'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
+import { CANVAS_HEIGHT, CANVAS_WIDTH } from './main'
+
+const SYMBOLS = {
+	wall: '#',
+	exit: 'E',
+	player: '@',
+	enemy: '&',
+	ghost: 'G',
+} as const
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
@@ -42,6 +51,9 @@ export class Renderer {
 			return
 		}
 
+		this.context.font = `${CELL_SIZE}px monospace`
+		this.context.textBaseline = 'top'
+
 		this.renderMaze()
 		this.renderExit()
 		this.renderEnemy()
@@ -51,7 +63,13 @@ export class Renderer {
 
 	private clear(): void {
 		this.context.fillStyle = '#000'
-		this.context.fillRect(0, 0, 320, 200)
+		this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+	}
+
+	private renderCharacter(character: string, point: Point): void {
+		const position = toPixel(point)
+
+		this.context.fillText(character, position.x, position.y)
 	}
 
 	private renderMaze(): void {
@@ -67,63 +85,47 @@ export class Renderer {
 	}
 
 	private renderWall(x: number, y: number): void {
-		const position = toPixel({ x, y })
-
-		this.context.fillStyle = '#fff'
-
-		this.context.fillRect(position.x, position.y, CELL_SIZE, CELL_SIZE)
+		this.context.fillStyle = '#33ff66'
+		this.renderCharacter(SYMBOLS.wall, { x, y })
 	}
 
 	private renderPlayer() {
-		const position = toPixel(this.player.position)
+		this.context.fillStyle = '#ffffff'
+		this.renderCharacter(SYMBOLS.player, this.player.position)
+	}
 
-		this.context.fillStyle = '#00ff66'
-		this.context.fillRect(
-			position.x + 2,
-			position.y + 2,
-			CELL_SIZE - 4,
-			CELL_SIZE - 4,
-		)
+	private renderEnemy(): void {
+		this.context.fillStyle = '#ff3333'
+		this.renderCharacter(SYMBOLS.enemy, this.enemy.position)
+	}
+
+	private renderGhost(): void {
+		this.context.fillStyle = '#cc66ff'
+		this.renderCharacter(SYMBOLS.ghost, this.ghost.position)
 	}
 
 	private renderExit(): void {
-		const position = toPixel(this.maze.exitPosition)
-
 		this.context.fillStyle = '#ffff00'
-
-		this.context.fillRect(
-			position.x + 2,
-			position.y + 2,
-			CELL_SIZE - 4,
-			CELL_SIZE - 4,
-		)
+		this.renderCharacter(SYMBOLS.exit, this.maze.exitPosition)
 	}
 
 	private renderVictory(): void {
 		this.context.fillStyle = '#00ff66'
 		this.context.font = '20px monospace'
+		this.context.textBaseline = 'top'
 		this.context.textAlign = 'center'
 
-		this.context.fillText('YOU ESCAPED', 160, 90)
+		this.context.fillText('YOU ESCAPED', Math.abs(CANVAS_WIDTH / 2), 90)
 
 		this.context.font = '10px monospace'
 
-		this.context.fillText('PRESS ENTER TO PLAY AGAIN', 160, 115)
+		this.context.fillText(
+			'PRESS ENTER TO PLAY AGAIN',
+			Math.abs(CANVAS_WIDTH / 2),
+			115,
+		)
 
 		this.context.textAlign = 'left'
-	}
-
-	private renderEnemy(): void {
-		const position = toPixel(this.enemy.position)
-
-		this.context.fillStyle = '#ff3333'
-
-		this.context.fillRect(
-			position.x + 2,
-			position.y + 2,
-			CELL_SIZE - 4,
-			CELL_SIZE - 4,
-		)
 	}
 
 	private renderGameOver(): void {
@@ -131,12 +133,16 @@ export class Renderer {
 		this.context.font = '20px monospace'
 		this.context.textAlign = 'center'
 
-		this.context.fillText('YOU WERE CAUGHT', 160, 90)
+		this.context.fillText('YOU WERE CAUGHT', Math.abs(CANVAS_WIDTH / 2), 90)
 
 		this.context.fillStyle = '#fff'
 		this.context.font = '10px monospace'
 
-		this.context.fillText('PRESS ENTER TO TRY AGAIN', 160, 115)
+		this.context.fillText(
+			'PRESS ENTER TO TRY AGAIN',
+			Math.abs(CANVAS_WIDTH / 2),
+			115,
+		)
 
 		this.context.textAlign = 'left'
 	}
@@ -154,18 +160,5 @@ export class Renderer {
 				CELL_SIZE - 6,
 			)
 		}
-	}
-
-	private renderGhost(): void {
-		const position = toPixel(this.ghost.position)
-
-		this.context.fillStyle = '#cc66ff'
-
-		this.context.fillRect(
-			position.x + 2,
-			position.y + 2,
-			CELL_SIZE - 4,
-			CELL_SIZE - 4,
-		)
 	}
 }
