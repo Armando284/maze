@@ -48,7 +48,10 @@ export class Hud {
 			state.fright > 0 ? `ANTIVIRUS ${Math.ceil(state.fright)}` : ''
 		this.lives.textContent = '@'.repeat(Math.max(0, state.lives))
 		this.mute.textContent = state.muted ? 'MUTE' : ''
-		this.status.textContent = STATUS_TEXT[state.status]
+		this.status.textContent =
+			state.status === 'playing' && state.deathTimer > 0
+				? 'SYSTEM FAILURE'
+				: STATUS_TEXT[state.status]
 	}
 }
 

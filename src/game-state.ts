@@ -13,6 +13,17 @@ export interface Popup {
 	color: string
 }
 
+export interface Particle {
+	x: number
+	y: number
+	vx: number
+	vy: number
+	life: number
+	maxLife: number
+	color: string
+	size: number
+}
+
 export interface GameState {
 	status: GameStatus
 	score: number
@@ -25,7 +36,10 @@ export interface GameState {
 	flash: number
 	muted: boolean
 	introTimer: number
+	deathTimer: number
+	shake: number
 	popups: Popup[]
+	particles: Particle[]
 	scores: ScoreEntry[]
 	hsName: string
 	hsIndex: number

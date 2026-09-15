@@ -74,6 +74,16 @@ export class Renderer {
 	}
 
 	private renderGame(): void {
+		if (this.state.shake > 0) {
+			const magnitude = this.state.shake * 0.5
+
+			this.context.save()
+			this.context.translate(
+				(Math.random() * 2 - 1) * magnitude,
+				(Math.random() * 2 - 1) * magnitude,
+			)
+		}
+
 		this.context.font = `${CELL_SIZE}px monospace`
 		this.context.textBaseline = 'top'
 
@@ -84,6 +94,7 @@ export class Renderer {
 		this.renderDaemons()
 		this.renderGhost()
 		this.renderPlayer()
+		this.renderParticles()
 
 		if (this.state.flash > 0) {
 			const alpha = Math.min(1, this.state.flash * 4)
@@ -93,6 +104,37 @@ export class Renderer {
 		}
 
 		this.renderPopups()
+
+		if (this.state.shake > 0) {
+			this.context.restore()
+		}
+	}
+
+	private withGlow(blur: number, color: string, draw: () => void): void {
+		const context = this.context
+
+		context.shadowColor = color
+		context.shadowBlur = blur
+		draw()
+		context.shadowBlur = 0
+	}
+
+	private renderParticles(): void {
+		for (const particle of this.state.particles) {
+			const position = toPixel({ x: particle.x, y: particle.y })
+			const alpha = Math.max(0, particle.life / particle.maxLife)
+
+			this.context.fillStyle = particle.color
+			this.context.globalAlpha = alpha
+			this.context.fillRect(
+				position.x + CELL_SIZE / 2 - particle.size / 2,
+				position.y + CELL_SIZE / 2 - particle.size / 2,
+				particle.size,
+				particle.size,
+			)
+		}
+
+		this.context.globalAlpha = 1
 	}
 
 	private renderPopups(): void {
@@ -198,23 +240,29 @@ export class Renderer {
 	private renderPills(): void {
 		const blink = Math.floor(Date.now() / 450) % 2 === 0
 
-		this.context.fillStyle = blink ? '#00ffd0' : '#005b4a'
+		this.withGlow(5, '#00ffd0', () => {
+			this.context.fillStyle = blink ? '#00ffd0' : '#005b4a'
 
-		for (let y = 0; y < MAZE_HEIGHT; y++) {
-			for (let x = 0; x < MAZE_WIDTH; x++) {
-				const cell = this.maze.getCell({ x, y })
+			for (let y = 0; y < MAZE_HEIGHT; y++) {
+				for (let x = 0; x < MAZE_WIDTH; x++) {
+					const cell = this.maze.getCell({ x, y })
 
-				if (cell === 'pill') {
-					this.renderCharacter(SYMBOLS.pill, { x, y })
+					if (cell === 'pill') {
+						this.renderCharacter(SYMBOLS.pill, { x, y })
+					}
 				}
 			}
-		}
+		})
 	}
 
 	private renderDaemons(): void {
 		for (const enemy of this.enemies) {
-			this.context.fillStyle = enemy.scared ? '#00ddff' : '#ff3333'
-			this.renderCharacter(SYMBOLS.daemon, enemy.position)
+			const color = enemy.scared ? '#00ddff' : '#ff3333'
+
+			this.withGlow(4, color, () => {
+				this.context.fillStyle = color
+				this.renderCharacter(SYMBOLS.daemon, enemy.position)
+			})
 		}
 	}
 
@@ -223,11 +271,21 @@ export class Renderer {
 			return
 		}
 
-		this.context.fillStyle = this.ghost.scared ? '#00ddff' : '#cc66ff'
-		this.renderCharacter(SYMBOLS.glitch, this.ghost.position)
+		const color = this.ghost.scared ? '#00ddff' : '#cc66ff'
+
+		this.withGlow(5, color, () => {
+			this.context.fillStyle = color
+			this.renderCharacter(SYMBOLS.glitch, this.ghost.position)
+		})
 	}
 
 	private renderPlayer(): void {
+		if (this.state.deathTimer > 0) {
+			this.context.fillStyle = '#ff3333'
+			this.renderCharacter('X', this.player.position)
+			return
+		}
+
 		if (
 			this.state.invincible > 0 &&
 			Math.floor(Date.now() / 150) % 2 === 0
@@ -235,15 +293,19 @@ export class Renderer {
 			return
 		}
 
-		this.context.fillStyle = '#ffffff'
-		this.renderCharacter(SYMBOLS.player, this.player.position)
+		this.withGlow(6, '#00ff66', () => {
+			this.context.fillStyle = '#ffffff'
+			this.renderCharacter(SYMBOLS.player, this.player.position)
+		})
 	}
 
 	private renderExit(): void {
 		const blink = Math.floor(Date.now() / 420) % 2 === 0
 
-		this.context.fillStyle = blink ? '#ffff00' : '#5a5a00'
-		this.renderCharacter(SYMBOLS.exit, this.maze.exitPosition)
+		this.withGlow(4, '#ffff00', () => {
+			this.context.fillStyle = blink ? '#ffff00' : '#5a5a00'
+			this.renderCharacter(SYMBOLS.exit, this.maze.exitPosition)
+		})
 	}
 
 	private renderTitle(): void {
@@ -252,9 +314,11 @@ export class Renderer {
 
 		const prompt = Math.floor(Date.now() / 500) % 2 === 0
 
-		this.context.fillStyle = '#33ff66'
-		this.context.font = '22px monospace'
-		this.context.fillText('MAZE.EXE', 14, 20)
+		this.withGlow(8, '#00ff66', () => {
+			this.context.fillStyle = '#33ff66'
+			this.context.font = '22px monospace'
+			this.context.fillText('MAZE.EXE', 14, 20)
+		})
 
 		this.context.fillStyle = '#00ffd0'
 		this.context.font = '12px monospace'

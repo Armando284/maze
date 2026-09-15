@@ -22,6 +22,8 @@ const INVINCIBLE_DURATION = 2
 const FLASH_DURATION = 0.3
 const INTRO_DURATION = 1.4
 const POPUP_LIFE = 0.9
+const DEATH_DURATION = 0.9
+const SHAKE_MAX = 10
 const MAX_SCORES = 5
 const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
@@ -66,7 +68,10 @@ export class Game {
 		flash: 0,
 		muted: false,
 		introTimer: 0,
+		deathTimer: 0,
+		shake: 0,
 		popups: [],
+		particles: [],
 		scores: this.loadScores(),
 		hsName: 'AAA',
 		hsIndex: 0,
@@ -124,8 +129,11 @@ export class Game {
 		this.state.fright = 0
 		this.state.invincible = 0
 		this.state.flash = 0
+		this.state.deathTimer = 0
+		this.state.shake = 0
 		this.state.hsEntry = false
 		this.state.popups.length = 0
+		this.state.particles.length = 0
 	}
 
 	private spawnEnemies(): void {
@@ -196,10 +204,27 @@ export class Game {
 			return
 		}
 
+		if (this.state.deathTimer > 0) {
+			this.state.deathTimer -= deltaTime / 1000
+			this.state.flash = Math.max(0, this.state.flash - deltaTime / 1000)
+			this.state.shake = Math.max(0, this.state.shake - deltaTime / 50)
+			this.agePopups(deltaTime)
+			this.ageParticles(deltaTime)
+			this.spawnDeathEmbers()
+
+			if (this.state.deathTimer <= 0) {
+				this.state.deathTimer = 0
+				this.gameOver()
+				this.updateHiScore()
+			}
+			return
+		}
+
 		this.updatePlayer(deltaTime)
 		this.updateFrightState(deltaTime)
 		this.updateTimers(deltaTime)
 		this.agePopups(deltaTime)
+		this.ageParticles(deltaTime)
 
 		for (const enemy of this.enemies) {
 			enemy.update(deltaTime)
@@ -233,9 +258,65 @@ export class Game {
 		this.state.popups.push({ text, x, y, life: POPUP_LIFE, color })
 	}
 
+	private ageParticles(deltaTime: number): void {
+		for (const particle of this.state.particles) {
+			particle.life -= deltaTime / 1000
+			particle.x += particle.vx * (deltaTime / 1000)
+			particle.y += particle.vy * (deltaTime / 1000)
+		}
+
+		if (this.state.particles.length > 0) {
+			this.state.particles = this.state.particles.filter(
+				(particle) => particle.life > 0,
+			)
+		}
+	}
+
+	private spawnBurst(
+		x: number,
+		y: number,
+		color: string,
+		count: number,
+		speed: number,
+		size: number,
+	): void {
+		for (let index = 0; index < count; index++) {
+			const angle = Math.random() * Math.PI * 2
+			const velocity = speed * (0.3 + Math.random() * 0.7)
+
+			this.state.particles.push({
+				x,
+				y,
+				vx: Math.cos(angle) * velocity,
+				vy: Math.sin(angle) * velocity,
+				life: 0.3 + Math.random() * 0.3,
+				maxLife: 0.6,
+				color,
+				size: size * (0.6 + Math.random() * 0.8),
+			})
+		}
+	}
+
+	private spawnDeathEmbers(): void {
+		const position = this.player.position
+		const palette = ['#ff3333', '#ffaa33', '#ffff66']
+
+		for (let index = 0; index < 2; index++) {
+			this.spawnBurst(
+				position.x,
+				position.y,
+				palette[Math.floor(Math.random() * palette.length)],
+				1,
+				2.2,
+				2.5,
+			)
+		}
+	}
+
 	private updateTimers(deltaTime: number): void {
 		this.state.invincible = Math.max(0, this.state.invincible - deltaTime / 1000)
 		this.state.flash = Math.max(0, this.state.flash - deltaTime / 1000)
+		this.state.shake = Math.max(0, this.state.shake - deltaTime / 50)
 	}
 
 	private updateFrightState(deltaTime: number): void {
@@ -488,6 +569,7 @@ export class Game {
 		this.state.fright = FRIGHT_DURATION
 		this.audio.power()
 		this.addPopup('+50', point.x, point.y, '#00ffd0')
+		this.spawnBurst(point.x, point.y, '#00ffd0', 8, 2, 2)
 
 		for (const enemy of this.enemies) {
 			enemy.scared = true
@@ -544,10 +626,19 @@ export class Game {
 	private loseLife(): void {
 		this.state.lives--
 		this.state.flash = FLASH_DURATION
+		this.state.shake = SHAKE_MAX
 		this.audio.death()
+		this.spawnBurst(
+			this.player.position.x,
+			this.player.position.y,
+			'#ff3333',
+			18,
+			3,
+			3,
+		)
 
 		if (this.state.lives <= 0) {
-			this.gameOver()
+			this.state.deathTimer = DEATH_DURATION
 			return
 		}
 
@@ -575,13 +666,22 @@ export class Game {
 		for (const enemy of this.enemies) {
 			if (enemy.scared && enemy.isTouchingPlayer()) {
 				this.state.score += SLAY_BONUS
+				this.state.shake = 3
 				this.audio.slay()
 				this.addPopup(
-				'+200',
-				enemy.position.x,
-				enemy.position.y,
-				'#ffcc33',
-			)
+					'+200',
+					enemy.position.x,
+					enemy.position.y,
+					'#ffcc33',
+				)
+				this.spawnBurst(
+					enemy.position.x,
+					enemy.position.y,
+					'#ffcc33',
+					14,
+					3,
+					2.5,
+				)
 				continue
 			}
 
@@ -603,12 +703,21 @@ export class Game {
 
 		this.ghost.removed = true
 		this.state.score += SLAY_BONUS
+		this.state.shake = 4
 		this.audio.slay()
 		this.addPopup(
 			'+200',
 			this.ghost.position.x,
 			this.ghost.position.y,
 			'#ffcc33',
+		)
+		this.spawnBurst(
+			this.ghost.position.x,
+			this.ghost.position.y,
+			'#00ddff',
+			18,
+			3.2,
+			3,
 		)
 	}
 
