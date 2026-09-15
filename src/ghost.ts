@@ -9,7 +9,7 @@ export class Ghost {
 	scared = false
 	removed = false
 
-	private readonly moveInterval: number
+	private moveInterval: number
 	private moveTimer = 0
 
 	private readonly pathfinder: Pathfinder
@@ -20,6 +20,14 @@ export class Ghost {
 		this.player = player
 		this.moveInterval = moveInterval
 		this.pathfinder = new Pathfinder((position) => this.canMove(position))
+	}
+
+	reset(startPosition: Point, moveInterval: number): void {
+		this.position = { ...startPosition }
+		this.moveInterval = moveInterval
+		this.scared = false
+		this.removed = false
+		this.moveTimer = 0
 	}
 
 	update(deltaTime: number): void {

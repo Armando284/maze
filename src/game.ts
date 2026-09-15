@@ -1,6 +1,9 @@
 import { Player } from './player'
 import { Renderer } from './renderer'
-import { type GameState } from './game-state'
+import {
+	type GameState,
+	type ScoreEntry,
+} from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
@@ -14,7 +17,13 @@ const PILL_BONUS = 50
 const SLAY_BONUS = 200
 const SESSION_BONUS = 1000
 const FRIGHT_DURATION = 8
+const MAX_LIVES = 3
+const INVINCIBLE_DURATION = 2
+const FLASH_DURATION = 0.3
+const MAX_SCORES = 5
+const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
+const INITIALS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 const DIRECTION_BY_KEY: Record<string, Point> = {
 	ArrowUp: { x: 0, y: -1 },
@@ -36,17 +45,25 @@ export class Game {
 	private lastTime = 0
 	private animationFrame = 0
 	private playerMoveTimer = 0
+	private started = false
 	private readonly heldKeys = new Set<string>()
 	private readonly pressOrder: string[] = []
 	private readonly audio = new Audio()
 	private readonly hud = new Hud()
 	private readonly state: GameState = {
-		status: 'playing',
+		status: 'title',
 		score: 0,
-		hiScore: this.loadHiScore(),
+		hiScore: 0,
 		session: 1,
 		dots: 0,
 		fright: 0,
+		lives: MAX_LIVES,
+		invincible: 0,
+		flash: 0,
+		scores: this.loadScores(),
+		hsName: 'AAA',
+		hsIndex: 0,
+		hsEntry: false,
 	}
 	private readonly enemyMinDistance = 12
 	private readonly ghostMinDistance = 18
@@ -59,8 +76,10 @@ export class Game {
 
 	constructor(context: CanvasRenderingContext2D) {
 		this.context = context
+		this.state.hiScore = this.loadHiScore()
 		this.createGame()
 		this.createRenderer()
+		this.state.status = 'title'
 
 		window.addEventListener('keydown', (event) => {
 			this.handleKeyDown(event)
@@ -79,12 +98,7 @@ export class Game {
 
 		this.player = new Player(this.maze)
 
-		const starts = this.findEnemyStarts(this.enemyCount)
-
-		this.enemies = starts.map(
-			(start) =>
-				new Enemy(this.maze, this.player, start, this.enemyInterval),
-		)
+		this.spawnEnemies()
 
 		this.ghost = new Ghost(
 			this.player,
@@ -97,8 +111,29 @@ export class Game {
 		this.playerMoveTimer = 0
 
 		this.state.status = 'playing'
-		this.state.score = 0
 		this.state.dots = this.maze.dotsRemaining
+		this.state.fright = 0
+		this.state.invincible = 0
+		this.state.flash = 0
+		this.state.hsEntry = false
+	}
+
+	private spawnEnemies(): void {
+		const starts = this.findEnemyStarts(this.enemyCount)
+
+		this.enemies.length = 0
+		this.enemies.push(
+			...starts.map(
+				(start) =>
+					new Enemy(this.maze, this.player, start, this.enemyInterval),
+			),
+		)
+	}
+
+	private resetEntities(): void {
+		this.spawnEnemies()
+		this.ghost.reset(this.findGhostStart(), this.ghostInterval)
+		this.player.reset()
 		this.state.fright = 0
 	}
 
@@ -114,6 +149,7 @@ export class Game {
 	}
 
 	start(): void {
+		this.started = true
 		this.animationFrame = requestAnimationFrame((time) => this.loop(time))
 	}
 
@@ -131,20 +167,19 @@ export class Game {
 	}
 
 	private update(deltaTime: number): void {
-		if (this.state.status === 'playing') {
-			this.updatePlayer(deltaTime)
-			this.updateFrightState(deltaTime)
+		if (this.state.status !== 'playing') {
+			this.updateHiScore()
+			return
 		}
+
+		this.updatePlayer(deltaTime)
+		this.updateFrightState(deltaTime)
+		this.updateTimers(deltaTime)
 
 		for (const enemy of this.enemies) {
 			enemy.update(deltaTime)
 		}
 		this.ghost.update(deltaTime)
-
-		if (this.state.status !== 'playing') {
-			this.updateHiScore()
-			return
-		}
 
 		if (this.checkVictory()) {
 			return
@@ -155,6 +190,11 @@ export class Game {
 		}
 
 		this.updateHiScore()
+	}
+
+	private updateTimers(deltaTime: number): void {
+		this.state.invincible = Math.max(0, this.state.invincible - deltaTime / 1000)
+		this.state.flash = Math.max(0, this.state.flash - deltaTime / 1000)
 	}
 
 	private updateFrightState(deltaTime: number): void {
@@ -205,15 +245,34 @@ export class Game {
 	private handleKeyDown(event: KeyboardEvent): void {
 		this.audio.unlock()
 
-		if (event.key === 'Enter' && this.state.status !== 'playing') {
-			this.restart()
+		if (!this.started) {
 			return
 		}
 
-		if (this.state.status !== 'playing') {
-			return
-		}
+		switch (this.state.status) {
+			case 'title':
+				if (isActionKey(event.key)) {
+					this.newGame()
+				}
+				return
 
+			case 'gameover':
+				this.handleGameOverKey(event)
+				return
+
+			case 'won':
+				if (isActionKey(event.key)) {
+					this.nextSession()
+				}
+				return
+
+			case 'playing':
+				this.handlePlayingKey(event)
+				return
+		}
+	}
+
+	private handlePlayingKey(event: KeyboardEvent): void {
 		if (!DIRECTION_BY_KEY[event.key]) {
 			return
 		}
@@ -226,7 +285,70 @@ export class Game {
 		this.pressOrder.push(event.key)
 	}
 
+	private handleGameOverKey(event: KeyboardEvent): void {
+		if (!this.state.hsEntry) {
+			if (isActionKey(event.key)) {
+				this.state.status = 'title'
+			}
+			return
+		}
+
+		this.handleInitialsKey(event)
+	}
+
+	private handleInitialsKey(event: KeyboardEvent): void {
+		const key = event.key
+
+		switch (key) {
+			case 'ArrowUp':
+			case 'w':
+			case 'W':
+				this.cycleInitial(-1)
+				break
+
+			case 'ArrowDown':
+			case 's':
+			case 'S':
+				this.cycleInitial(1)
+				break
+
+			case 'ArrowLeft':
+			case 'a':
+			case 'A':
+				this.state.hsIndex = Math.max(0, this.state.hsIndex - 1)
+				break
+
+			case 'ArrowRight':
+			case 'd':
+			case 'D':
+				this.state.hsIndex = Math.min(2, this.state.hsIndex + 1)
+				break
+
+			case 'Enter':
+				this.submitScore()
+				break
+		}
+	}
+
+	private cycleInitial(step: number): void {
+		const letter = this.state.hsName[this.state.hsIndex]
+
+		if (!letter) {
+			return
+		}
+
+		const index = INITIALS.indexOf(letter)
+		const next = (index + step + INITIALS.length) % INITIALS.length
+		const updated = this.state.hsName.split('')
+		updated[this.state.hsIndex] = INITIALS[next]
+		this.state.hsName = updated.join('')
+	}
+
 	private handleKeyUp(event: KeyboardEvent): void {
+		if (!this.started) {
+			return
+		}
+
 		if (!this.heldKeys.delete(event.key)) {
 			return
 		}
@@ -286,7 +408,6 @@ export class Game {
 
 		if (this.player.isAtExit() || allBitsCollected) {
 			this.state.status = 'won'
-			this.state.session += 1
 			this.state.score += SESSION_BONUS
 			this.updateHiScore()
 			this.audio.victory()
@@ -297,19 +418,22 @@ export class Game {
 	}
 
 	private checkCollisions(): boolean {
+		const vulnerable = this.state.invincible <= 0
+
 		for (const enemy of this.enemies) {
-			if (enemy.isTouchingPlayer() && !enemy.scared) {
-				this.lose()
+			if (enemy.isTouchingPlayer() && !enemy.scared && vulnerable) {
+				this.loseLife()
 				return true
 			}
 		}
 
 		if (
+			vulnerable &&
 			!this.ghost.removed &&
 			this.ghost.isTouchingPlayer() &&
 			!this.ghost.scared
 		) {
-			this.lose()
+			this.loseLife()
 			return true
 		}
 
@@ -317,6 +441,33 @@ export class Game {
 		this.slayGhostIfScared()
 
 		return false
+	}
+
+	private loseLife(): void {
+		this.state.lives--
+		this.state.flash = FLASH_DURATION
+		this.audio.death()
+
+		if (this.state.lives <= 0) {
+			this.gameOver()
+			return
+		}
+
+		this.resetEntities()
+		this.state.invincible = INVINCIBLE_DURATION
+	}
+
+	private gameOver(): void {
+		this.state.status = 'gameover'
+		this.audio.death()
+
+		if (this.qualifiesForScores(this.state.score)) {
+			this.state.hsEntry = true
+			this.state.hsName = 'AAA'
+			this.state.hsIndex = 0
+		}
+
+		this.updateHiScore()
 	}
 
 	private slayScaredDaemons(): void {
@@ -350,10 +501,19 @@ export class Game {
 		this.audio.slay()
 	}
 
-	private lose(): void {
-		this.state.status = 'lost'
-		this.updateHiScore()
-		this.audio.death()
+	private newGame(): void {
+		this.state.session = 1
+		this.state.score = 0
+		this.state.lives = MAX_LIVES
+		this.createGame()
+		this.createRenderer()
+	}
+
+	private nextSession(): void {
+		this.state.session += 1
+		this.state.lives = MAX_LIVES
+		this.createGame()
+		this.createRenderer()
 	}
 
 	private updateHiScore(): void {
@@ -370,17 +530,69 @@ export class Game {
 		}
 	}
 
-	private loadHiScore(): number {
+	private qualifiesForScores(score: number): boolean {
+		if (score <= 0) {
+			return false
+		}
+
+		const list = this.state.scores
+
+		if (list.length < MAX_SCORES) {
+			return true
+		}
+
+		return score > list[list.length - 1].score
+	}
+
+	private submitScore(): void {
+		const entry: ScoreEntry = {
+			name: this.state.hsName,
+			score: this.state.score,
+		}
+
+		this.state.scores = [...this.state.scores, entry]
+			.sort((a, b) => b.score - a.score)
+			.slice(0, MAX_SCORES)
+		this.state.hsEntry = false
+
+		this.updateHiScore()
+
 		try {
-			return Number(localStorage.getItem(HI_SCORE_KEY)) || 0
+			localStorage.setItem(SCORES_KEY, JSON.stringify(this.state.scores))
 		} catch {
-			return 0
+			// storage unavailable, ignore
 		}
 	}
 
-	private restart(): void {
-		this.createGame()
-		this.createRenderer()
+	private loadScores(): ScoreEntry[] {
+		try {
+			const raw = localStorage.getItem(SCORES_KEY)
+
+			if (!raw) {
+				return []
+			}
+
+			const parsed = JSON.parse(raw) as unknown
+
+			if (!Array.isArray(parsed)) {
+				return []
+			}
+
+			return parsed.filter(isScoreEntry)
+		} catch {
+			return []
+		}
+	}
+
+	private loadHiScore(): number {
+		try {
+			const stored = Number(localStorage.getItem(HI_SCORE_KEY)) || 0
+			const best = this.state?.scores[0]?.score ?? 0
+
+			return Math.max(stored, best)
+		} catch {
+			return 0
+		}
 	}
 
 	private get enemyCount(): number {
@@ -445,24 +657,46 @@ export class Game {
 	}
 
 	private isBlocked(point: Point): boolean {
+		const vulnerable = this.state.invincible <= 0
+
 		for (const enemy of this.enemies) {
-			if (!enemy.scared && this.isSameCell(enemy.position, point)) {
+			if (!enemy.scared && vulnerable && this.isSameCell(enemy.position, point)) {
 				return true
 			}
 		}
 
 		if (
-			!this.ghost.removed &&
-			!this.ghost.scared &&
-			this.isSameCell(this.ghost.position, point)
+			this.ghost.removed ||
+			this.ghost.scared ||
+			!vulnerable ||
+			!this.isSameCell(this.ghost.position, point)
 		) {
-			return true
+			return false
 		}
 
-		return false
+		return true
 	}
 
 	private isSameCell(pointA: Point, pointB: Point): boolean {
 		return pointA.x === pointB.x && pointA.y === pointB.y
 	}
+}
+
+function isActionKey(key: string): boolean {
+	return key === 'Enter' || key === ' '
+}
+
+function isScoreEntry(value: unknown): value is ScoreEntry {
+	if (typeof value !== 'object' || value === null) {
+		return false
+	}
+
+	const entry = value as Partial<ScoreEntry>
+
+	return (
+		typeof entry.name === 'string' &&
+		typeof entry.score === 'number' &&
+		entry.name.length > 0 &&
+		entry.name.length <= 3
+	)
 }

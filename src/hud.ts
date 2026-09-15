@@ -1,9 +1,10 @@
 import type { GameState, GameStatus } from './game-state'
 
 const STATUS_TEXT: Record<GameStatus, string> = {
+	title: 'INSERT COIN',
 	playing: 'RAIDING THE VAULT',
 	won: 'ACCESS GRANTED',
-	lost: 'SYSTEM FAILURE',
+	gameover: 'GAME OVER',
 }
 
 function element(id: string): HTMLElement {
@@ -22,6 +23,7 @@ export class Hud {
 	private readonly session: HTMLElement
 	private readonly bits: HTMLElement
 	private readonly fright: HTMLElement
+	private readonly lives: HTMLElement
 	private readonly status: HTMLElement
 
 	constructor() {
@@ -30,6 +32,7 @@ export class Hud {
 		this.session = element('session')
 		this.bits = element('bits')
 		this.fright = element('fright')
+		this.lives = element('lives')
 		this.status = element('status')
 	}
 
@@ -40,6 +43,7 @@ export class Hud {
 		this.bits.textContent = String(state.dots).padStart(3, '0')
 		this.fright.textContent =
 			state.fright > 0 ? `ANTIVIRUS ${Math.ceil(state.fright)}` : ''
+		this.lives.textContent = '@'.repeat(Math.max(0, state.lives))
 		this.status.textContent = STATUS_TEXT[state.status]
 	}
 }
