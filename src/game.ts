@@ -1,6 +1,7 @@
 import { Player } from './player'
 import { Renderer } from './renderer'
 import { type GameState } from './game-state'
+import {Maze} from './maze'
 
 export class Game {
   private lastTime = 0
@@ -9,9 +10,11 @@ export class Game {
   private readonly state: GameState = {
     status: 'playing',
   }
+  private readonly maze: Maze
 
   constructor(context: CanvasRenderingContext2D) {
-    this.player = new Player();
+    this.maze = new Maze();
+    this.player = new Player(this.maze);
     this.renderer = new Renderer(context, this.player, this.state);
 
     window.addEventListener('keydown', (event) => {

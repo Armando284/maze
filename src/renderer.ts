@@ -1,116 +1,107 @@
 import type { GameState } from './game-state'
-import {
-  CELL_SIZE,
-  GRID_HEIGHT,
-  GRID_WIDTH,
-  toPixel,
-} from './grid'
-import { MAZE } from './maze'
+import { CELL_SIZE, toPixel } from './grid'
+import { MAZE_WIDTH, MAZE_HEIGHT, getCell } from './maze'
 import { Player } from './player'
 
 export class Renderer {
-  private readonly context: CanvasRenderingContext2D
-  private readonly player: Player
-  private readonly state: GameState
+	private readonly context: CanvasRenderingContext2D
+	private readonly player: Player
+	private readonly state: GameState
 
-  constructor(
-    context: CanvasRenderingContext2D,
-    player: Player,
-    state: GameState
-  ) {
-    this.context = context
-    this.player = player
-    this.state = state
-  }
+	constructor(
+		context: CanvasRenderingContext2D,
+		player: Player,
+		state: GameState,
+	) {
+		this.context = context
+		this.player = player
+		this.state = state
+	}
 
-  render(): void {
-    this.clear()
+	render(): void {
+		this.clear()
 
-    if (this.state.status === 'won') {
-      this.renderVictory()
-      return
-    }
+		if (this.state.status === 'won') {
+			this.renderVictory()
+			return
+		}
 
-    this.renderMaze()
-    this.renderPlayer()
-    this.renderExit()
-  }
+		this.renderMaze()
+		this.renderPlayer()
+		this.renderExit()
+	}
 
-  private clear(): void {
-    this.context.fillStyle = '#000'
-    this.context.fillRect(0, 0, 320, 200)
-  }
+	private clear(): void {
+		this.context.fillStyle = '#000'
+		this.context.fillRect(0, 0, 320, 200)
+	}
 
-  private renderMaze(): void {
-    this.context.fillStyle = '#00ff66'
+	private renderMaze(): void {
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				const cell = getCell(x, y)
 
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      for (let x = 0; x < GRID_WIDTH; x++) {
-        if (MAZE[y][x] !== '#') {
-          continue
-        }
+				if (cell === 'wall') {
+					this.renderWall(x, y)
+				}
+			}
+		}
+	}
 
-        const position = toPixel({ x, y })
+	private renderWall(x: number, y: number): void {
+		const position = toPixel({ x, y })
 
-        this.context.fillRect(
-          position.x,
-          position.y,
-          CELL_SIZE,
-          CELL_SIZE,
-        )
-      }
-    }
-  }
+		this.context.fillStyle = '#fff'
 
-  private renderPlayer() {
-    const position = toPixel(this.player.position)
+		this.context.fillRect(position.x, position.y, CELL_SIZE, CELL_SIZE)
+	}
 
-    this.context.fillStyle = '#00ff66'
-    this.context.fillRect(
-      position.x + 2,
-      position.y + 2,
-      CELL_SIZE - 4,
-      CELL_SIZE - 4
-    )
-  }
+	private renderPlayer() {
+		const position = toPixel(this.player.position)
 
-  private renderExit() {
-    const y = MAZE.findIndex((row) => row.includes('E'))
-    if (y === -1) {
-      return
-    }
+		this.context.fillStyle = '#00ff66'
+		this.context.fillRect(
+			position.x + 2,
+			position.y + 2,
+			CELL_SIZE - 4,
+			CELL_SIZE - 4,
+		)
+	}
 
-    const x = MAZE[y].indexOf('E')
-    const position = toPixel({ x, y })
+	private renderExit(): void {
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				if (getCell(x, y) !== 'exit') {
+					continue
+				}
 
-    this.context.fillStyle = '#ffff00'
-    this.context.fillRect(
-      position.x + 2,
-      position.y + 2,
-      CELL_SIZE - 4,
-      CELL_SIZE - 4
-    )
-  }
+				const position = toPixel({ x, y })
 
-  private renderVictory(): void {
-    this.context.fillStyle = '#00ff66'
-    this.context.font = '20px monospace'
-    this.context.textAlign = 'center'
+				this.context.fillStyle = '#ffff00'
 
-    this.context.fillText(
-      'YOU ESCAPED',
-      160,
-      90,
-    )
+				this.context.fillRect(
+					position.x + 2,
+					position.y + 2,
+					CELL_SIZE - 4,
+					CELL_SIZE - 4,
+				)
 
-    this.context.font = '10px monospace'
+				return
+			}
+		}
+	}
 
-    this.context.fillText(
-      'PRESS ENTER TO PLAY AGAIN',
-      160,
-      115,
-    )
+	private renderVictory(): void {
+		this.context.fillStyle = '#00ff66'
+		this.context.font = '20px monospace'
+		this.context.textAlign = 'center'
 
-    this.context.textAlign = 'left'
-  }
+		this.context.fillText('YOU ESCAPED', 160, 90)
+
+		this.context.font = '10px monospace'
+
+		this.context.fillText('PRESS ENTER TO PLAY AGAIN', 160, 115)
+
+		this.context.textAlign = 'left'
+	}
 }
