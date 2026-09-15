@@ -4,7 +4,7 @@ import { type GameState } from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
-import type { Point } from './grid'
+import { type Point, manhattanDistance } from './grid'
 
 export class Game {
 	private readonly context: CanvasRenderingContext2D
@@ -12,6 +12,9 @@ export class Game {
 	private readonly state: GameState = {
 		status: 'playing',
 	}
+	private readonly enemyMinDistance = 12
+	private readonly ghostMinDistance = 18
+
 	private maze!: Maze
 	private player!: Player
 	private enemy!: Enemy
@@ -137,28 +140,32 @@ export class Game {
 	}
 
 	private findEnemyStart(): Point {
-		let position = this.maze.findRandomFloor()
+		for (let attempt = 0; attempt < 100; attempt++) {
+			const position = this.maze.findRandomFloor()
 
-		while (
-			position.x === this.player.position.x &&
-			position.y === this.player.position.y
-		) {
-			position = this.maze.findRandomFloor()
+			if (
+				manhattanDistance(position, this.player.position) >=
+				this.enemyMinDistance
+			) {
+				return position
+			}
 		}
 
-		return position
+		return this.maze.findRandomFloor()
 	}
 
 	private findGhostStart(): Point {
-		let position = this.maze.findRandomFloor()
+		for (let attempt = 0; attempt < 100; attempt++) {
+			const position = this.maze.findRandomFloor()
 
-		while (
-			position.x === this.player.position.x &&
-			position.y === this.player.position.y
-		) {
-			position = this.maze.findRandomFloor()
+			if (
+				manhattanDistance(position, this.player.position) >=
+				this.ghostMinDistance
+			) {
+				return position
+			}
 		}
 
-		return position
+		return this.maze.findRandomFloor()
 	}
 }
