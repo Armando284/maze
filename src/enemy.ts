@@ -36,7 +36,7 @@ export class Enemy {
 			return
 		}
 
-		this.position = { ...path[1] }
+		this.moveTo(path[1])
 	}
 
 	isTouchingPlayer(): boolean {
@@ -44,5 +44,9 @@ export class Enemy {
 			this.position.x === this.player.position.x &&
 			this.position.y === this.player.position.y
 		)
+	}
+
+	private moveTo(position: Point): void {
+		this.position = { ...position }
 	}
 }

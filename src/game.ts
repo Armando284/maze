@@ -95,27 +95,40 @@ export class Game {
 			case 'ArrowUp':
 			case 'w':
 			case 'W':
-				this.player.move({ x: 0, y: -1 })
+				this.movePlayer({ x: 0, y: -1 })
 				break
 
 			case 'ArrowDown':
 			case 's':
 			case 'S':
-				this.player.move({ x: 0, y: 1 })
+				this.movePlayer({ x: 0, y: 1 })
 				break
 
 			case 'ArrowLeft':
 			case 'a':
 			case 'A':
-				this.player.move({ x: -1, y: 0 })
+				this.movePlayer({ x: -1, y: 0 })
 				break
 
 			case 'ArrowRight':
 			case 'd':
 			case 'D':
-				this.player.move({ x: 1, y: 0 })
+				this.movePlayer({ x: 1, y: 0 })
 				break
 		}
+	}
+
+	private movePlayer(direction: Point): void {
+		const nextPosition = {
+			x: this.player.position.x + direction.x,
+			y: this.player.position.y + direction.y,
+		}
+
+		if (this.isOccupied(nextPosition)) {
+			return
+		}
+
+		this.player.move(direction)
 	}
 
 	private checkVictory(): boolean {
@@ -167,5 +180,14 @@ export class Game {
 		}
 
 		return this.maze.findRandomFloor()
+	}
+
+	private isOccupied(point: Point): boolean {
+		return (
+			(point.x === this.enemy.position.x &&
+				point.y === this.enemy.position.y) ||
+			(point.x === this.ghost.position.x &&
+				point.y === this.ghost.position.y)
+		)
 	}
 }

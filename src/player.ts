@@ -13,17 +13,18 @@ export class Player {
 		this.maze = maze
 	}
 
-	move(direction: Point): void {
+	move(direction: Point): boolean {
 		const newPosition: Point = {
 			x: this.position.x + direction.x,
 			y: this.position.y + direction.y,
 		}
 
 		if (!this.maze.isWalkable(newPosition)) {
-			return
+			return false
 		}
 
 		this.position = newPosition
+		return true
 	}
 
 	isAtExit(): boolean {
