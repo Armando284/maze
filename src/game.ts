@@ -4,13 +4,45 @@ import { type GameState } from './game-state'
 import { Maze } from './maze'
 import { Enemy } from './enemy'
 import { Ghost } from './ghost'
+import { Audio } from './audio'
+import { Hud } from './hud'
 import { type Point, manhattanDistance } from './grid'
+
+const PLAYER_MOVE_INTERVAL = 110
+const POINTS_PER_BIT = 10
+const SESSION_BONUS = 1000
+const HI_SCORE_KEY = 'maze-hi-score'
+
+const DIRECTION_BY_KEY: Record<string, Point> = {
+	ArrowUp: { x: 0, y: -1 },
+	w: { x: 0, y: -1 },
+	W: { x: 0, y: -1 },
+	ArrowDown: { x: 0, y: 1 },
+	s: { x: 0, y: 1 },
+	S: { x: 0, y: 1 },
+	ArrowLeft: { x: -1, y: 0 },
+	a: { x: -1, y: 0 },
+	A: { x: -1, y: 0 },
+	ArrowRight: { x: 1, y: 0 },
+	d: { x: 1, y: 0 },
+	D: { x: 1, y: 0 },
+}
 
 export class Game {
 	private readonly context: CanvasRenderingContext2D
 	private lastTime = 0
+	private animationFrame = 0
+	private playerMoveTimer = 0
+	private readonly heldKeys = new Set<string>()
+	private readonly pressOrder: string[] = []
+	private readonly audio = new Audio()
+	private readonly hud = new Hud()
 	private readonly state: GameState = {
 		status: 'playing',
+		score: 0,
+		hiScore: this.loadHiScore(),
+		session: 1,
+		dots: 0,
 	}
 	private readonly enemyMinDistance = 12
 	private readonly ghostMinDistance = 18
@@ -27,7 +59,10 @@ export class Game {
 		this.createRenderer()
 
 		window.addEventListener('keydown', (event) => {
-			this.handleInput(event)
+			this.handleKeyDown(event)
+		})
+		window.addEventListener('keyup', (event) => {
+			this.handleKeyUp(event)
 		})
 	}
 
@@ -40,7 +75,13 @@ export class Game {
 
 		this.ghost = new Ghost(this.player, this.findGhostStart())
 
+		this.heldKeys.clear()
+		this.pressOrder.length = 0
+		this.playerMoveTimer = 0
+
 		this.state.status = 'playing'
+		this.state.score = 0
+		this.state.dots = this.maze.dotsRemaining
 	}
 
 	private createRenderer(): void {
@@ -55,7 +96,7 @@ export class Game {
 	}
 
 	start(): void {
-		requestAnimationFrame((time) => this.loop(time))
+		this.animationFrame = requestAnimationFrame((time) => this.loop(time))
 	}
 
 	private loop(time: number): void {
@@ -64,13 +105,25 @@ export class Game {
 
 		this.update(deltaTime)
 		this.renderer.render()
+		this.hud.update(this.state)
 
-		requestAnimationFrame((nextTime) => this.loop(nextTime))
+		this.animationFrame = requestAnimationFrame((nextTime) =>
+			this.loop(nextTime),
+		)
 	}
 
 	private update(deltaTime: number): void {
+		if (this.state.status === 'playing') {
+			this.updatePlayer(deltaTime)
+		}
+
 		this.enemy.update(deltaTime)
 		this.ghost.update(deltaTime)
+
+		if (this.state.status !== 'playing') {
+			this.updateHiScore()
+			return
+		}
 
 		if (this.checkVictory()) {
 			return
@@ -79,10 +132,44 @@ export class Game {
 		if (this.checkDefeat()) {
 			return
 		}
+
+		this.updateHiScore()
 	}
 
-	private handleInput(event: KeyboardEvent): void {
-		if (this.state.status !== 'playing' && event.key === 'Enter') {
+	private updatePlayer(deltaTime: number): void {
+		this.playerMoveTimer += deltaTime
+
+		if (this.playerMoveTimer < PLAYER_MOVE_INTERVAL) {
+			return
+		}
+
+		this.playerMoveTimer = 0
+
+		if (this.pressOrder.length === 0) {
+			return
+		}
+
+		const direction = this.currentDirection
+
+		if (direction) {
+			this.movePlayer(direction)
+		}
+	}
+
+	private get currentDirection(): Point | null {
+		const key = this.pressOrder[this.pressOrder.length - 1]
+
+		if (!key) {
+			return null
+		}
+
+		return DIRECTION_BY_KEY[key] ?? null
+	}
+
+	private handleKeyDown(event: KeyboardEvent): void {
+		this.audio.unlock()
+
+		if (event.key === 'Enter' && this.state.status !== 'playing') {
 			this.restart()
 			return
 		}
@@ -91,30 +178,27 @@ export class Game {
 			return
 		}
 
-		switch (event.key) {
-			case 'ArrowUp':
-			case 'w':
-			case 'W':
-				this.movePlayer({ x: 0, y: -1 })
-				break
+		if (!DIRECTION_BY_KEY[event.key]) {
+			return
+		}
 
-			case 'ArrowDown':
-			case 's':
-			case 'S':
-				this.movePlayer({ x: 0, y: 1 })
-				break
+		if (this.heldKeys.has(event.key)) {
+			return
+		}
 
-			case 'ArrowLeft':
-			case 'a':
-			case 'A':
-				this.movePlayer({ x: -1, y: 0 })
-				break
+		this.heldKeys.add(event.key)
+		this.pressOrder.push(event.key)
+	}
 
-			case 'ArrowRight':
-			case 'd':
-			case 'D':
-				this.movePlayer({ x: 1, y: 0 })
-				break
+	private handleKeyUp(event: KeyboardEvent): void {
+		if (!this.heldKeys.delete(event.key)) {
+			return
+		}
+
+		const index = this.pressOrder.lastIndexOf(event.key)
+
+		if (index !== -1) {
+			this.pressOrder.splice(index, 1)
 		}
 	}
 
@@ -128,23 +212,69 @@ export class Game {
 			return
 		}
 
-		this.player.move(direction)
+		if (!this.player.move(direction)) {
+			return
+		}
+
+		this.collectBit(this.player.position)
+	}
+
+	private collectBit(point: Point): void {
+		if (!this.maze.collectDot(point)) {
+			return
+		}
+
+		this.state.score += POINTS_PER_BIT
+		this.state.dots = this.maze.dotsRemaining
+		this.audio.coin()
 	}
 
 	private checkVictory(): boolean {
-		if (this.player.isAtExit()) {
+		const allBitsCollected = this.state.dots === 0
+
+		if (this.player.isAtExit() || allBitsCollected) {
 			this.state.status = 'won'
+			this.state.session += 1
+			this.state.score += SESSION_BONUS
+			this.updateHiScore()
+			this.audio.victory()
 			return true
 		}
+
 		return false
 	}
 
 	private checkDefeat(): boolean {
 		if (this.enemy.isTouchingPlayer() || this.ghost.isTouchingPlayer()) {
 			this.state.status = 'lost'
+			this.updateHiScore()
+			this.audio.death()
 			return true
 		}
+
 		return false
+	}
+
+	private updateHiScore(): void {
+		if (this.state.score <= this.state.hiScore) {
+			return
+		}
+
+		this.state.hiScore = this.state.score
+
+		try {
+			localStorage.setItem(HI_SCORE_KEY, String(this.state.hiScore))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadHiScore(): number {
+		try {
+			return Number(localStorage.getItem(HI_SCORE_KEY)) || 0
+		} catch {
+			return 0
+		}
 	}
 
 	private restart(): void {

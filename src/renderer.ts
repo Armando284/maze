@@ -9,6 +9,7 @@ import { CANVAS_HEIGHT, CANVAS_WIDTH } from './main'
 const SYMBOLS = {
 	wall: '#',
 	exit: 'E',
+	dot: '·',
 	player: '@',
 	enemy: '&',
 	ghost: 'G',
@@ -55,6 +56,7 @@ export class Renderer {
 		this.context.textBaseline = 'top'
 
 		this.renderMaze()
+		this.renderBits()
 		this.renderExit()
 		this.renderEnemy()
 		this.renderGhost()
@@ -89,6 +91,20 @@ export class Renderer {
 		this.renderCharacter(SYMBOLS.wall, { x, y })
 	}
 
+	private renderBits(): void {
+		this.context.fillStyle = '#1d6b33'
+
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				const cell = this.maze.getCell({ x, y })
+
+				if (cell === 'dot') {
+					this.renderCharacter(SYMBOLS.dot, { x, y })
+				}
+			}
+		}
+	}
+
 	private renderPlayer() {
 		this.context.fillStyle = '#ffffff'
 		this.renderCharacter(SYMBOLS.player, this.player.position)
@@ -115,12 +131,12 @@ export class Renderer {
 		this.context.textBaseline = 'top'
 		this.context.textAlign = 'center'
 
-		this.context.fillText('YOU ESCAPED', Math.abs(CANVAS_WIDTH / 2), 90)
+		this.context.fillText('ACCESS GRANTED', Math.abs(CANVAS_WIDTH / 2), 90)
 
 		this.context.font = '10px monospace'
 
 		this.context.fillText(
-			'PRESS ENTER TO PLAY AGAIN',
+			'PRESS ENTER TO RAID NEXT SESSION',
 			Math.abs(CANVAS_WIDTH / 2),
 			115,
 		)
@@ -131,15 +147,16 @@ export class Renderer {
 	private renderGameOver(): void {
 		this.context.fillStyle = '#ff3333'
 		this.context.font = '20px monospace'
+		this.context.textBaseline = 'top'
 		this.context.textAlign = 'center'
 
-		this.context.fillText('YOU WERE CAUGHT', Math.abs(CANVAS_WIDTH / 2), 90)
+		this.context.fillText('SYSTEM FAILURE', Math.abs(CANVAS_WIDTH / 2), 90)
 
 		this.context.fillStyle = '#fff'
 		this.context.font = '10px monospace'
 
 		this.context.fillText(
-			'PRESS ENTER TO TRY AGAIN',
+			'PRESS ENTER TO RETRY SESSION',
 			Math.abs(CANVAS_WIDTH / 2),
 			115,
 		)

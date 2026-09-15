@@ -1,0 +1,45 @@
+import type { GameState, GameStatus } from './game-state'
+
+const STATUS_TEXT: Record<GameStatus, string> = {
+	playing: 'RAIDING THE VAULT',
+	won: 'ACCESS GRANTED',
+	lost: 'SYSTEM FAILURE',
+}
+
+function element(id: string): HTMLElement {
+	const node = document.getElementById(id)
+
+	if (!node) {
+		throw new Error(`HUD element #${id} not found`)
+	}
+
+	return node
+}
+
+export class Hud {
+	private readonly score: HTMLElement
+	private readonly hiScore: HTMLElement
+	private readonly session: HTMLElement
+	private readonly bits: HTMLElement
+	private readonly status: HTMLElement
+
+	constructor() {
+		this.score = element('score')
+		this.hiScore = element('hi-score')
+		this.session = element('session')
+		this.bits = element('bits')
+		this.status = element('status')
+	}
+
+	update(state: GameState): void {
+		this.score.textContent = pad(state.score)
+		this.hiScore.textContent = pad(state.hiScore)
+		this.session.textContent = String(state.session).padStart(2, '0')
+		this.bits.textContent = String(state.dots).padStart(3, '0')
+		this.status.textContent = STATUS_TEXT[state.status]
+	}
+}
+
+function pad(value: number): string {
+	return String(value).padStart(6, '0')
+}

@@ -1,6 +1,6 @@
 import type { Point } from './grid'
 
-export type Cell = 'wall' | 'floor' | 'exit'
+export type Cell = 'wall' | 'floor' | 'dot' | 'exit'
 
 export const MAZE_WIDTH = 31
 export const MAZE_HEIGHT = 19
@@ -8,9 +8,11 @@ export const MAZE_HEIGHT = 19
 export class Maze {
 	private readonly cells: Cell[][]
 	private readonly loopDensity = 0.3
+	private dotCount = 0
 
 	constructor() {
 		this.cells = this.generate()
+		this.dotCount = this.countDots()
 	}
 
 	getCell(point: Point): Cell {
@@ -54,9 +56,52 @@ export class Maze {
 
 		this.addLoops(cells)
 
+		this.fillDots(cells)
+
+		cells[start.y][start.x] = 'floor'
+
 		cells[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'exit'
 
 		return cells
+	}
+
+	private countDots(): number {
+		let count = 0
+
+		for (const row of this.cells) {
+			for (const cell of row) {
+				if (cell === 'dot') {
+					count++
+				}
+			}
+		}
+
+		return count
+	}
+
+	private fillDots(cells: Cell[][]): void {
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				if (cells[y][x] === 'floor') {
+					cells[y][x] = 'dot'
+				}
+			}
+		}
+	}
+
+	collectDot(point: Point): boolean {
+		if (this.cells[point.y][point.x] !== 'dot') {
+			return false
+		}
+
+		this.cells[point.y][point.x] = 'floor'
+		this.dotCount--
+
+		return true
+	}
+
+	get dotsRemaining(): number {
+		return this.dotCount
 	}
 
 	private carve(cells: Cell[][], x: number, y: number): void {
@@ -109,7 +154,9 @@ export class Maze {
 
 		for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
 			for (let x = 1; x < MAZE_WIDTH - 1; x++) {
-				if (this.cells[y][x] === 'floor') {
+				const cell = this.cells[y][x]
+
+				if (cell === 'floor' || cell === 'dot') {
 					floorCells.push({ x, y })
 				}
 			}
