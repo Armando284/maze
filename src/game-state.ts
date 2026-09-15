@@ -1,8 +1,16 @@
-export type GameStatus = 'title' | 'playing' | 'won' | 'gameover'
+export type GameStatus = 'title' | 'playing' | 'paused' | 'won' | 'gameover'
 
 export interface ScoreEntry {
 	name: string
 	score: number
+}
+
+export interface Popup {
+	text: string
+	x: number
+	y: number
+	life: number
+	color: string
 }
 
 export interface GameState {
@@ -15,6 +23,9 @@ export interface GameState {
 	lives: number
 	invincible: number
 	flash: number
+	muted: boolean
+	introTimer: number
+	popups: Popup[]
 	scores: ScoreEntry[]
 	hsName: string
 	hsIndex: number

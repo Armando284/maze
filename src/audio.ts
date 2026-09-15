@@ -1,9 +1,92 @@
+const MELODY = [
+	0, 440, 0, 523.25, 0, 440, 0, 392, 0, 349.23, 0, 392, 0, 440, 0, 220,
+]
+const BASS = [
+	110, 110, 110, 110, 110, 110, 110, 110, 87.31, 87.31, 87.31, 87.31, 98, 98,
+	110, 110,
+]
+
+const MUSIC_STEP = 0.16
+const TICK_INTERVAL = 25
+
 export class Audio {
 	private context: AudioContext | null = null
 	private output: GainNode | null = null
+	private muted = false
+	private musicPlaying = false
+	private musicStep = 0
+	private nextNoteTime = 0
+	private ticker = 0
+
+	get isMuted(): boolean {
+		return this.muted
+	}
+
+	setMuted(muted: boolean): void {
+		this.muted = muted
+	}
 
 	unlock(): void {
 		this.ensure()
+	}
+
+	startMusic(): void {
+		this.ensure()
+
+		if (!this.context) {
+			return
+		}
+
+		this.musicPlaying = true
+		this.musicStep = 0
+		this.nextNoteTime = this.context.currentTime + 0.05
+
+		if (this.ticker === 0) {
+			this.ticker = window.setInterval(() => this.tick(), TICK_INTERVAL)
+		}
+	}
+
+	pauseMusic(): void {
+		this.musicPlaying = false
+	}
+
+	stopMusic(): void {
+		this.musicPlaying = false
+	}
+
+	resumeMusic(): void {
+		this.musicPlaying = true
+	}
+
+	private tick(): void {
+		const context = this.context
+
+		if (!context || !this.musicPlaying) {
+			return
+		}
+
+		if (this.nextNoteTime < context.currentTime - 0.1) {
+			this.nextNoteTime = context.currentTime + 0.05
+		}
+
+		while (this.nextNoteTime < context.currentTime + 0.12) {
+			this.playStep(this.musicStep, this.nextNoteTime)
+			this.musicStep = (this.musicStep + 1) % MELODY.length
+			this.nextNoteTime += MUSIC_STEP
+		}
+	}
+
+	private playStep(step: number, startTime: number): void {
+		const melody = MELODY[step] ?? 0
+		const bass = BASS[step] ?? 0
+
+		if (melody) {
+			this.emit(melody, startTime, 0.13)
+		}
+
+		if (bass) {
+			this.emit(bass, startTime, 0.15)
+		}
 	}
 
 	private ensure(): AudioContext | null {
@@ -39,25 +122,39 @@ export class Audio {
 
 	private tone(frequency: number, duration: number, delay = 0): void {
 		const context = this.ensure()
+
+		if (!context) {
+			return
+		}
+
+		this.emit(frequency, context.currentTime + delay, duration)
+	}
+
+	private emit(frequency: number, startTime: number, duration: number): void {
+		if (this.muted) {
+			return
+		}
+
+		const context = this.context
+
 		if (!context || !this.output) {
 			return
 		}
 
-		const start = context.currentTime + delay
 		const oscillator = context.createOscillator()
 		const gain = context.createGain()
 
 		oscillator.type = 'square'
-		oscillator.frequency.setValueAtTime(frequency, start)
+		oscillator.frequency.setValueAtTime(frequency, startTime)
 
-		gain.gain.setValueAtTime(1, start)
-		gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
+		gain.gain.setValueAtTime(1, startTime)
+		gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
 
 		oscillator.connect(gain)
 		gain.connect(this.output)
 
-		oscillator.start(start)
-		oscillator.stop(start + duration + 0.02)
+		oscillator.start(startTime)
+		oscillator.stop(startTime + duration + 0.02)
 	}
 
 	coin(): void {

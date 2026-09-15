@@ -3,6 +3,7 @@ import type { GameState, GameStatus } from './game-state'
 const STATUS_TEXT: Record<GameStatus, string> = {
 	title: 'INSERT COIN',
 	playing: 'RAIDING THE VAULT',
+	paused: 'PAUSED',
 	won: 'ACCESS GRANTED',
 	gameover: 'GAME OVER',
 }
@@ -24,6 +25,7 @@ export class Hud {
 	private readonly bits: HTMLElement
 	private readonly fright: HTMLElement
 	private readonly lives: HTMLElement
+	private readonly mute: HTMLElement
 	private readonly status: HTMLElement
 
 	constructor() {
@@ -33,6 +35,7 @@ export class Hud {
 		this.bits = element('bits')
 		this.fright = element('fright')
 		this.lives = element('lives')
+		this.mute = element('mute')
 		this.status = element('status')
 	}
 
@@ -44,6 +47,7 @@ export class Hud {
 		this.fright.textContent =
 			state.fright > 0 ? `ANTIVIRUS ${Math.ceil(state.fright)}` : ''
 		this.lives.textContent = '@'.repeat(Math.max(0, state.lives))
+		this.mute.textContent = state.muted ? 'MUTE' : ''
 		this.status.textContent = STATUS_TEXT[state.status]
 	}
 }

@@ -20,10 +20,14 @@ const FRIGHT_DURATION = 8
 const MAX_LIVES = 3
 const INVINCIBLE_DURATION = 2
 const FLASH_DURATION = 0.3
+const INTRO_DURATION = 1.4
+const POPUP_LIFE = 0.9
 const MAX_SCORES = 5
 const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
+const MUTED_KEY = 'maze-muted'
 const INITIALS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+const PAUSE_KEYS = new Set(['p', 'P', 'Escape'])
 
 const DIRECTION_BY_KEY: Record<string, Point> = {
 	ArrowUp: { x: 0, y: -1 },
@@ -60,6 +64,9 @@ export class Game {
 		lives: MAX_LIVES,
 		invincible: 0,
 		flash: 0,
+		muted: false,
+		introTimer: 0,
+		popups: [],
 		scores: this.loadScores(),
 		hsName: 'AAA',
 		hsIndex: 0,
@@ -76,6 +83,8 @@ export class Game {
 
 	constructor(context: CanvasRenderingContext2D) {
 		this.context = context
+		this.state.muted = this.loadMuted()
+		this.audio.setMuted(this.state.muted)
 		this.state.hiScore = this.loadHiScore()
 		this.createGame()
 		this.createRenderer()
@@ -116,6 +125,7 @@ export class Game {
 		this.state.invincible = 0
 		this.state.flash = 0
 		this.state.hsEntry = false
+		this.state.popups.length = 0
 	}
 
 	private spawnEnemies(): void {
@@ -150,6 +160,7 @@ export class Game {
 
 	start(): void {
 		this.started = true
+		this.audio.startMusic()
 		this.animationFrame = requestAnimationFrame((time) => this.loop(time))
 	}
 
@@ -167,7 +178,20 @@ export class Game {
 	}
 
 	private update(deltaTime: number): void {
+		if (this.state.status === 'paused') {
+			return
+		}
+
 		if (this.state.status !== 'playing') {
+			this.updateHiScore()
+			return
+		}
+
+		if (this.state.introTimer > 0) {
+			this.state.introTimer = Math.max(
+				0,
+				this.state.introTimer - deltaTime / 1000,
+			)
 			this.updateHiScore()
 			return
 		}
@@ -175,6 +199,7 @@ export class Game {
 		this.updatePlayer(deltaTime)
 		this.updateFrightState(deltaTime)
 		this.updateTimers(deltaTime)
+		this.agePopups(deltaTime)
 
 		for (const enemy of this.enemies) {
 			enemy.update(deltaTime)
@@ -190,6 +215,22 @@ export class Game {
 		}
 
 		this.updateHiScore()
+	}
+
+	private agePopups(deltaTime: number): void {
+		for (const popup of this.state.popups) {
+			popup.life -= deltaTime / 1000
+		}
+
+		if (this.state.popups.length > 0) {
+			this.state.popups = this.state.popups.filter(
+				(popup) => popup.life > 0,
+			)
+		}
+	}
+
+	private addPopup(text: string, x: number, y: number, color: string): void {
+		this.state.popups.push({ text, x, y, life: POPUP_LIFE, color })
 	}
 
 	private updateTimers(deltaTime: number): void {
@@ -249,6 +290,11 @@ export class Game {
 			return
 		}
 
+		if (event.key === 'm' || event.key === 'M') {
+			this.toggleMute()
+			return
+		}
+
 		switch (this.state.status) {
 			case 'title':
 				if (isActionKey(event.key)) {
@@ -267,8 +313,53 @@ export class Game {
 				return
 
 			case 'playing':
+				if (PAUSE_KEYS.has(event.key)) {
+					this.setPaused(true)
+					return
+				}
 				this.handlePlayingKey(event)
 				return
+
+			case 'paused':
+				if (PAUSE_KEYS.has(event.key)) {
+					this.setPaused(false)
+				}
+				return
+		}
+	}
+
+	private setPaused(paused: boolean): void {
+		this.state.status = paused ? 'paused' : 'playing'
+
+		if (paused) {
+			this.audio.pauseMusic()
+		} else {
+			this.audio.resumeMusic()
+		}
+	}
+
+	private toggleMute(): void {
+		const muted = !this.audio.isMuted
+
+		this.audio.setMuted(muted)
+		this.state.muted = muted
+
+		if (!muted && this.state.status === 'playing') {
+			this.audio.resumeMusic()
+		}
+
+		try {
+			localStorage.setItem(MUTED_KEY, muted ? '1' : '0')
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadMuted(): boolean {
+		try {
+			return localStorage.getItem(MUTED_KEY) === '1'
+		} catch {
+			return false
 		}
 	}
 
@@ -396,6 +487,7 @@ export class Game {
 		this.state.score += PILL_BONUS
 		this.state.fright = FRIGHT_DURATION
 		this.audio.power()
+		this.addPopup('+50', point.x, point.y, '#00ffd0')
 
 		for (const enemy of this.enemies) {
 			enemy.scared = true
@@ -409,6 +501,12 @@ export class Game {
 		if (this.player.isAtExit() || allBitsCollected) {
 			this.state.status = 'won'
 			this.state.score += SESSION_BONUS
+			this.addPopup(
+				'+1000',
+				this.maze.exitPosition.x,
+				this.maze.exitPosition.y,
+				'#00ff66',
+			)
 			this.updateHiScore()
 			this.audio.victory()
 			return true
@@ -459,6 +557,7 @@ export class Game {
 
 	private gameOver(): void {
 		this.state.status = 'gameover'
+		this.audio.stopMusic()
 		this.audio.death()
 
 		if (this.qualifiesForScores(this.state.score)) {
@@ -477,6 +576,12 @@ export class Game {
 			if (enemy.scared && enemy.isTouchingPlayer()) {
 				this.state.score += SLAY_BONUS
 				this.audio.slay()
+				this.addPopup(
+				'+200',
+				enemy.position.x,
+				enemy.position.y,
+				'#ffcc33',
+			)
 				continue
 			}
 
@@ -499,6 +604,12 @@ export class Game {
 		this.ghost.removed = true
 		this.state.score += SLAY_BONUS
 		this.audio.slay()
+		this.addPopup(
+			'+200',
+			this.ghost.position.x,
+			this.ghost.position.y,
+			'#ffcc33',
+		)
 	}
 
 	private newGame(): void {
@@ -507,6 +618,8 @@ export class Game {
 		this.state.lives = MAX_LIVES
 		this.createGame()
 		this.createRenderer()
+		this.state.introTimer = INTRO_DURATION
+		this.audio.startMusic()
 	}
 
 	private nextSession(): void {
@@ -514,6 +627,8 @@ export class Game {
 		this.state.lives = MAX_LIVES
 		this.createGame()
 		this.createRenderer()
+		this.state.introTimer = INTRO_DURATION
+		this.audio.resumeMusic()
 	}
 
 	private updateHiScore(): void {

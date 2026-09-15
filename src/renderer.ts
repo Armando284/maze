@@ -16,6 +16,8 @@ const SYMBOLS = {
 	glitch: '?',
 } as const
 
+const POPUP_LIFE = 0.9
+
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
 	private readonly player: Player
@@ -56,8 +58,17 @@ export class Renderer {
 				this.renderGameOver()
 				return
 
+			case 'paused':
+				this.renderGame()
+				this.renderPauseOverlay()
+				return
+
 			case 'playing':
 				this.renderGame()
+
+				if (this.state.introTimer > 0) {
+					this.renderIntro()
+				}
 				return
 		}
 	}
@@ -80,6 +91,66 @@ export class Renderer {
 			this.context.fillStyle = `rgba(255, 255, 255, ${alpha})`
 			this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 		}
+
+		this.renderPopups()
+	}
+
+	private renderPopups(): void {
+		this.context.font = '10px monospace'
+		this.context.textBaseline = 'top'
+
+		for (const popup of this.state.popups) {
+			const position = toPixel({ x: popup.x, y: popup.y })
+			const progress = 1 - popup.life / POPUP_LIFE
+
+			this.context.globalAlpha = Math.max(
+				0,
+				Math.min(1, popup.life / POPUP_LIFE),
+			)
+			this.context.fillStyle = popup.color
+			this.context.fillText(popup.text, position.x + 4, position.y - progress * 26)
+		}
+
+		this.context.globalAlpha = 1
+	}
+
+	private renderPauseOverlay(): void {
+		this.context.fillStyle = 'rgba(0, 0, 0, 0.72)'
+		this.context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+		this.context.textAlign = 'center'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '20px monospace'
+		this.context.fillText('PAUSED', CANVAS_WIDTH / 2, 104)
+
+		this.context.fillStyle = '#fff'
+		this.context.font = '10px monospace'
+		this.context.fillText('PRESS P TO RESUME   //   M TO MUTE', CANVAS_WIDTH / 2, 132)
+
+		this.context.textAlign = 'left'
+	}
+
+	private renderIntro(): void {
+		const ready = Math.floor(Date.now() / 400) % 2 === 0
+
+		this.context.textAlign = 'center'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '20px monospace'
+		this.context.fillText(
+			`SESSION ${pad2(this.state.session)}`,
+			CANVAS_WIDTH / 2,
+			96,
+		)
+
+		this.context.fillStyle = ready ? '#fff' : '#5a7a5a'
+		this.context.font = '12px monospace'
+		this.context.fillText('READY?', CANVAS_WIDTH / 2, 124)
+
+		this.context.textAlign = 'left'
 	}
 
 	private clear(): void {
@@ -200,9 +271,13 @@ export class Renderer {
 		this.context.font = '14px monospace'
 		this.context.fillText('> PRESS ENTER TO RAID <', 14, 174)
 
+		this.context.fillStyle = '#5a7a5a'
+		this.context.font = '10px monospace'
+		this.context.fillText('P PAUSE   //   M MUTE', 14, 194)
+
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
-		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 206)
+		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 216)
 	}
 
 	private renderVictory(): void {

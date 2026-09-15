@@ -45,6 +45,11 @@ body {
   text-align: right;
 }
 
+#mute {
+  color: #ff4444;
+  min-width: 40px;
+}
+
 #status {
   margin-left: auto;
   color: #ffcc33;
