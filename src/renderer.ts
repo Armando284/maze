@@ -10,16 +10,17 @@ const SYMBOLS = {
 	wall: '#',
 	exit: 'E',
 	dot: '·',
+	pill: '+',
 	player: '@',
-	enemy: '&',
-	ghost: 'G',
+	daemon: '&',
+	glitch: '?',
 } as const
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
 	private readonly player: Player
 	private readonly state: GameState
-	private readonly enemy: Enemy
+	private readonly enemies: readonly Enemy[]
 	private readonly ghost: Ghost
 	private readonly maze: Maze
 
@@ -27,14 +28,14 @@ export class Renderer {
 		context: CanvasRenderingContext2D,
 		maze: Maze,
 		player: Player,
-		enemy: Enemy,
+		enemies: readonly Enemy[],
 		ghost: Ghost,
 		state: GameState,
 	) {
 		this.context = context
 		this.maze = maze
 		this.player = player
-		this.enemy = enemy
+		this.enemies = enemies
 		this.ghost = ghost
 		this.state = state
 	}
@@ -57,8 +58,9 @@ export class Renderer {
 
 		this.renderMaze()
 		this.renderBits()
+		this.renderPills()
 		this.renderExit()
-		this.renderEnemy()
+		this.renderDaemons()
 		this.renderGhost()
 		this.renderPlayer()
 	}
@@ -105,19 +107,41 @@ export class Renderer {
 		}
 	}
 
-	private renderPlayer() {
-		this.context.fillStyle = '#ffffff'
-		this.renderCharacter(SYMBOLS.player, this.player.position)
+	private renderPills(): void {
+		const blink = Math.floor(Date.now() / 450) % 2 === 0
+
+		this.context.fillStyle = blink ? '#00ffd0' : '#005b4a'
+
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				const cell = this.maze.getCell({ x, y })
+
+				if (cell === 'pill') {
+					this.renderCharacter(SYMBOLS.pill, { x, y })
+				}
+			}
+		}
 	}
 
-	private renderEnemy(): void {
-		this.context.fillStyle = '#ff3333'
-		this.renderCharacter(SYMBOLS.enemy, this.enemy.position)
+	private renderDaemons(): void {
+		for (const enemy of this.enemies) {
+			this.context.fillStyle = enemy.scared ? '#00ddff' : '#ff3333'
+			this.renderCharacter(SYMBOLS.daemon, enemy.position)
+		}
 	}
 
 	private renderGhost(): void {
-		this.context.fillStyle = '#cc66ff'
-		this.renderCharacter(SYMBOLS.ghost, this.ghost.position)
+		if (this.ghost.removed) {
+			return
+		}
+
+		this.context.fillStyle = this.ghost.scared ? '#00ddff' : '#cc66ff'
+		this.renderCharacter(SYMBOLS.glitch, this.ghost.position)
+	}
+
+	private renderPlayer() {
+		this.context.fillStyle = '#ffffff'
+		this.renderCharacter(SYMBOLS.player, this.player.position)
 	}
 
 	private renderExit(): void {

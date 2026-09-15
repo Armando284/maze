@@ -1,6 +1,7 @@
 import type { Point } from './grid'
+import { manhattanDistance, shuffle } from './grid'
 
-export type Cell = 'wall' | 'floor' | 'dot' | 'exit'
+export type Cell = 'wall' | 'floor' | 'dot' | 'pill' | 'exit'
 
 export const MAZE_WIDTH = 31
 export const MAZE_HEIGHT = 19
@@ -62,7 +63,41 @@ export class Maze {
 
 		cells[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'exit'
 
+		this.placePills(cells)
+
 		return cells
+	}
+
+	private placePills(cells: Cell[][]): void {
+		const candidates: Point[] = []
+		const start: Point = { x: 1, y: 1 }
+		const exit = this.exitPosition
+
+		for (let y = 1; y < MAZE_HEIGHT - 1; y++) {
+			for (let x = 1; x < MAZE_WIDTH - 1; x++) {
+				if (cells[y][x] !== 'dot') {
+					continue
+				}
+
+				const point = { x, y }
+
+				if (manhattanDistance(point, start) < 10) {
+					continue
+				}
+
+				if (manhattanDistance(point, exit) < 4) {
+					continue
+				}
+
+				candidates.push(point)
+			}
+		}
+
+		const pills = shuffle(candidates).slice(0, 2)
+
+		for (const point of pills) {
+			cells[point.y][point.x] = 'pill'
+		}
 	}
 
 	private countDots(): number {
@@ -96,6 +131,16 @@ export class Maze {
 
 		this.cells[point.y][point.x] = 'floor'
 		this.dotCount--
+
+		return true
+	}
+
+	collectPill(point: Point): boolean {
+		if (this.cells[point.y][point.x] !== 'pill') {
+			return false
+		}
+
+		this.cells[point.y][point.x] = 'floor'
 
 		return true
 	}

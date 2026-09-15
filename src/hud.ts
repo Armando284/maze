@@ -21,6 +21,7 @@ export class Hud {
 	private readonly hiScore: HTMLElement
 	private readonly session: HTMLElement
 	private readonly bits: HTMLElement
+	private readonly fright: HTMLElement
 	private readonly status: HTMLElement
 
 	constructor() {
@@ -28,6 +29,7 @@ export class Hud {
 		this.hiScore = element('hi-score')
 		this.session = element('session')
 		this.bits = element('bits')
+		this.fright = element('fright')
 		this.status = element('status')
 	}
 
@@ -36,6 +38,8 @@ export class Hud {
 		this.hiScore.textContent = pad(state.hiScore)
 		this.session.textContent = String(state.session).padStart(2, '0')
 		this.bits.textContent = String(state.dots).padStart(3, '0')
+		this.fright.textContent =
+			state.fright > 0 ? `ANTIVIRUS ${Math.ceil(state.fright)}` : ''
 		this.status.textContent = STATUS_TEXT[state.status]
 	}
 }

@@ -6,4 +6,5 @@ export interface GameState {
 	hiScore: number
 	session: number
 	dots: number
+	fright: number
 }

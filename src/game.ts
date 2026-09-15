@@ -10,7 +10,10 @@ import { type Point, manhattanDistance } from './grid'
 
 const PLAYER_MOVE_INTERVAL = 110
 const POINTS_PER_BIT = 10
+const PILL_BONUS = 50
+const SLAY_BONUS = 200
 const SESSION_BONUS = 1000
+const FRIGHT_DURATION = 8
 const HI_SCORE_KEY = 'maze-hi-score'
 
 const DIRECTION_BY_KEY: Record<string, Point> = {
@@ -43,13 +46,14 @@ export class Game {
 		hiScore: this.loadHiScore(),
 		session: 1,
 		dots: 0,
+		fright: 0,
 	}
 	private readonly enemyMinDistance = 12
 	private readonly ghostMinDistance = 18
 
 	private maze!: Maze
 	private player!: Player
-	private enemy!: Enemy
+	private enemies: Enemy[] = []
 	private ghost!: Ghost
 	private renderer!: Renderer
 
@@ -66,14 +70,27 @@ export class Game {
 		})
 	}
 
+	unlockAudio(): void {
+		this.audio.unlock()
+	}
+
 	private createGame(): void {
 		this.maze = new Maze()
 
 		this.player = new Player(this.maze)
 
-		this.enemy = new Enemy(this.maze, this.player, this.findEnemyStart())
+		const starts = this.findEnemyStarts(this.enemyCount)
 
-		this.ghost = new Ghost(this.player, this.findGhostStart())
+		this.enemies = starts.map(
+			(start) =>
+				new Enemy(this.maze, this.player, start, this.enemyInterval),
+		)
+
+		this.ghost = new Ghost(
+			this.player,
+			this.findGhostStart(),
+			this.ghostInterval,
+		)
 
 		this.heldKeys.clear()
 		this.pressOrder.length = 0
@@ -82,6 +99,7 @@ export class Game {
 		this.state.status = 'playing'
 		this.state.score = 0
 		this.state.dots = this.maze.dotsRemaining
+		this.state.fright = 0
 	}
 
 	private createRenderer(): void {
@@ -89,7 +107,7 @@ export class Game {
 			this.context,
 			this.maze,
 			this.player,
-			this.enemy,
+			this.enemies,
 			this.ghost,
 			this.state,
 		)
@@ -115,9 +133,12 @@ export class Game {
 	private update(deltaTime: number): void {
 		if (this.state.status === 'playing') {
 			this.updatePlayer(deltaTime)
+			this.updateFrightState(deltaTime)
 		}
 
-		this.enemy.update(deltaTime)
+		for (const enemy of this.enemies) {
+			enemy.update(deltaTime)
+		}
 		this.ghost.update(deltaTime)
 
 		if (this.state.status !== 'playing') {
@@ -129,11 +150,26 @@ export class Game {
 			return
 		}
 
-		if (this.checkDefeat()) {
+		if (this.checkCollisions()) {
 			return
 		}
 
 		this.updateHiScore()
+	}
+
+	private updateFrightState(deltaTime: number): void {
+		if (this.state.fright <= 0) {
+			return
+		}
+
+		this.state.fright = Math.max(0, this.state.fright - deltaTime / 1000)
+
+		if (this.state.fright === 0) {
+			for (const enemy of this.enemies) {
+				enemy.scared = false
+			}
+			this.ghost.scared = false
+		}
 	}
 
 	private updatePlayer(deltaTime: number): void {
@@ -208,7 +244,7 @@ export class Game {
 			y: this.player.position.y + direction.y,
 		}
 
-		if (this.isOccupied(nextPosition)) {
+		if (this.isBlocked(nextPosition)) {
 			return
 		}
 
@@ -217,6 +253,7 @@ export class Game {
 		}
 
 		this.collectBit(this.player.position)
+		this.collectPill(this.player.position)
 	}
 
 	private collectBit(point: Point): void {
@@ -227,6 +264,21 @@ export class Game {
 		this.state.score += POINTS_PER_BIT
 		this.state.dots = this.maze.dotsRemaining
 		this.audio.coin()
+	}
+
+	private collectPill(point: Point): void {
+		if (!this.maze.collectPill(point)) {
+			return
+		}
+
+		this.state.score += PILL_BONUS
+		this.state.fright = FRIGHT_DURATION
+		this.audio.power()
+
+		for (const enemy of this.enemies) {
+			enemy.scared = true
+		}
+		this.ghost.scared = true
 	}
 
 	private checkVictory(): boolean {
@@ -244,15 +296,64 @@ export class Game {
 		return false
 	}
 
-	private checkDefeat(): boolean {
-		if (this.enemy.isTouchingPlayer() || this.ghost.isTouchingPlayer()) {
-			this.state.status = 'lost'
-			this.updateHiScore()
-			this.audio.death()
+	private checkCollisions(): boolean {
+		for (const enemy of this.enemies) {
+			if (enemy.isTouchingPlayer() && !enemy.scared) {
+				this.lose()
+				return true
+			}
+		}
+
+		if (
+			!this.ghost.removed &&
+			this.ghost.isTouchingPlayer() &&
+			!this.ghost.scared
+		) {
+			this.lose()
 			return true
 		}
 
+		this.slayScaredDaemons()
+		this.slayGhostIfScared()
+
 		return false
+	}
+
+	private slayScaredDaemons(): void {
+		const surviving: Enemy[] = []
+
+		for (const enemy of this.enemies) {
+			if (enemy.scared && enemy.isTouchingPlayer()) {
+				this.state.score += SLAY_BONUS
+				this.audio.slay()
+				continue
+			}
+
+			surviving.push(enemy)
+		}
+
+		this.enemies.length = 0
+		this.enemies.push(...surviving)
+	}
+
+	private slayGhostIfScared(): void {
+		if (this.ghost.removed || !this.ghost.scared) {
+			return
+		}
+
+		if (!this.ghost.isTouchingPlayer()) {
+			return
+		}
+
+		this.ghost.removed = true
+		this.state.score += SLAY_BONUS
+		this.audio.slay()
+	}
+
+	private lose(): void {
+		this.state.status = 'lost'
+		this.updateHiScore()
+		this.audio.death()
 	}
 
 	private updateHiScore(): void {
@@ -282,19 +383,50 @@ export class Game {
 		this.createRenderer()
 	}
 
-	private findEnemyStart(): Point {
-		for (let attempt = 0; attempt < 100; attempt++) {
-			const position = this.maze.findRandomFloor()
+	private get enemyCount(): number {
+		return Math.min(1 + (this.state.session - 1), 5)
+	}
 
-			if (
-				manhattanDistance(position, this.player.position) >=
-				this.enemyMinDistance
-			) {
-				return position
+	private get enemyInterval(): number {
+		return Math.max(140, 260 - (this.state.session - 1) * 20)
+	}
+
+	private get ghostInterval(): number {
+		return Math.max(280, 500 - (this.state.session - 1) * 40)
+	}
+
+	private findEnemyStarts(count: number): Point[] {
+		const starts: Point[] = []
+
+		for (let i = 0; i < count; i++) {
+			let position: Point | null = null
+
+			for (let attempt = 0; attempt < 200; attempt++) {
+				const candidate = this.maze.findRandomFloor()
+
+				if (
+					manhattanDistance(candidate, this.player.position) <
+					this.enemyMinDistance
+				) {
+					continue
+				}
+
+				const spreadOut = starts.every(
+					(start) => manhattanDistance(candidate, start) >= 6,
+				)
+
+				if (!spreadOut) {
+					continue
+				}
+
+				position = candidate
+				break
 			}
+
+			starts.push(position ?? this.maze.findRandomFloor())
 		}
 
-		return this.maze.findRandomFloor()
+		return starts
 	}
 
 	private findGhostStart(): Point {
@@ -312,12 +444,25 @@ export class Game {
 		return this.maze.findRandomFloor()
 	}
 
-	private isOccupied(point: Point): boolean {
-		return (
-			(point.x === this.enemy.position.x &&
-				point.y === this.enemy.position.y) ||
-			(point.x === this.ghost.position.x &&
-				point.y === this.ghost.position.y)
-		)
+	private isBlocked(point: Point): boolean {
+		for (const enemy of this.enemies) {
+			if (!enemy.scared && this.isSameCell(enemy.position, point)) {
+				return true
+			}
+		}
+
+		if (
+			!this.ghost.removed &&
+			!this.ghost.scared &&
+			this.isSameCell(this.ghost.position, point)
+		) {
+			return true
+		}
+
+		return false
+	}
+
+	private isSameCell(pointA: Point, pointB: Point): boolean {
+		return pointA.x === pointB.x && pointA.y === pointB.y
 	}
 }

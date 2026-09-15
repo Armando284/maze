@@ -1,5 +1,6 @@
 import './style.css'
 import { Game } from './game'
+import { Boot } from './boot'
 import { CELL_SIZE } from './grid'
 import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
 
@@ -20,5 +21,9 @@ canvas.width = CANVAS_WIDTH
 canvas.height = CANVAS_HEIGHT
 
 const game = new Game(context)
+const boot = new Boot()
 
-game.start()
+boot.start(() => {
+	game.unlockAudio()
+	game.start()
+})

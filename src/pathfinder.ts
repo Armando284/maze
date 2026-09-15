@@ -1,16 +1,10 @@
 import type { Point } from './grid'
+import { DIRECTIONS } from './grid'
 
 interface Node {
 	position: Point
 	previous: Node | null
 }
-
-const DIRECTIONS: Point[] = [
-	{ x: 0, y: -1 },
-	{ x: 1, y: 0 },
-	{ x: 0, y: 1 },
-	{ x: -1, y: 0 },
-]
 
 export type CanMove = (position: Point) => boolean
 

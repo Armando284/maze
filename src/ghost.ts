@@ -1,31 +1,46 @@
 import type { Point } from './grid'
+import { DIRECTIONS, shuffle } from './grid'
 import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
 import { Pathfinder } from './pathfinder'
 import { Player } from './player'
 
 export class Ghost {
 	position: Point
+	scared = false
+	removed = false
 
-	private readonly moveInterval = 500
+	private readonly moveInterval: number
 	private moveTimer = 0
 
 	private readonly pathfinder: Pathfinder
 	private readonly player: Player
 
-	constructor(player: Player, startPosition: Point) {
+	constructor(player: Player, startPosition: Point, moveInterval: number) {
 		this.position = { ...startPosition }
 		this.player = player
+		this.moveInterval = moveInterval
 		this.pathfinder = new Pathfinder((position) => this.canMove(position))
 	}
 
 	update(deltaTime: number): void {
+		if (this.removed) {
+			return
+		}
+
 		this.moveTimer += deltaTime
 
-		if (this.moveTimer < this.moveInterval) {
+		const interval = this.scared ? this.moveInterval * 1.5 : this.moveInterval
+
+		if (this.moveTimer < interval) {
 			return
 		}
 
 		this.moveTimer = 0
+
+		if (this.scared) {
+			this.wander()
+			return
+		}
 
 		const path = this.pathfinder.findPath(
 			this.position,
@@ -44,6 +59,21 @@ export class Ghost {
 			this.position.x === this.player.position.x &&
 			this.position.y === this.player.position.y
 		)
+	}
+
+	private wander(): void {
+		const options = shuffle(DIRECTIONS)
+			.map((direction) => ({
+				x: this.position.x + direction.x,
+				y: this.position.y + direction.y,
+			}))
+			.filter((position) => this.canMove(position))
+
+		if (options.length === 0) {
+			return
+		}
+
+		this.position = options[0]
 	}
 
 	private canMove(position: Point): boolean {

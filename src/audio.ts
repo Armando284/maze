@@ -65,6 +65,18 @@ export class Audio {
 		this.tone(990, 0.07, 0.05)
 	}
 
+	power(): void {
+		this.tone(440, 0.08)
+		this.tone(554, 0.08, 0.08)
+		this.tone(659, 0.14, 0.16)
+	}
+
+	slay(): void {
+		this.tone(880, 0.07)
+		this.tone(660, 0.09, 0.07)
+		this.tone(440, 0.18, 0.14)
+	}
+
 	victory(): void {
 		const notes = [523.25, 659.25, 783.99, 1046.5]
 
