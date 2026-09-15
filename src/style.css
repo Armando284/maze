@@ -50,6 +50,11 @@ body {
   min-width: 40px;
 }
 
+#pad {
+  color: #00ffd0;
+  min-width: 36px;
+}
+
 #status {
   margin-left: auto;
   color: #ffcc33;

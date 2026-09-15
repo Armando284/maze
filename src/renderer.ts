@@ -54,6 +54,10 @@ export class Renderer {
 				this.renderTitle()
 				return
 
+			case 'help':
+				this.renderHelp()
+				return
+
 			case 'paused':
 				this.renderGame()
 				this.renderPauseOverlay()
@@ -346,6 +350,55 @@ export class Renderer {
 		})
 	}
 
+	private renderHelp(): void {
+		const returnHint = Math.floor(Date.now() / 400) % 2 === 0
+
+		this.context.textAlign = 'left'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '22px monospace'
+		this.context.fillText('HELP // MANUAL', 14, 20)
+
+		const lines: string[] = [
+			'MOVE .... ARROWS / WASD / D-PAD / STICK',
+			'BITS · .. +10 EA, COMBO UP TO x5',
+			'+ ........ ANTIVIRUS, EAT SCARED DAEMONS',
+			'* ........ FREEZE DAEMONS 5S (LETHAL)',
+			'1 ........ RARE +1 LIFE',
+			'T ........ TELEPORT BETWEEN THE TWO TILES',
+			'& / ? .... DAEMON / GLITCH, -1 LIFE TOUCH',
+			'E ........ EXIT OR EMPTY THE VAULT +1000',
+			'SESSION .. NEXT ROUND: FASTER, MORE DAEMONS',
+		]
+
+		this.context.fillStyle = '#00ffd0'
+		this.context.font = '10px monospace'
+
+		lines.forEach((line, index) => {
+			this.context.fillText(line, 14, 56 + index * 16)
+		})
+
+		this.context.fillStyle = '#ffcc33'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`DIFFICULTY: ${this.state.difficulty.toUpperCase()}   [\u25C0 \u25B6]`,
+			14,
+			206,
+		)
+		this.context.fillText(
+			this.state.gamepadConnected
+				? 'GAMEPAD: CONNECTED'
+				: 'GAMEPAD: NO PAD',
+			14,
+			226,
+		)
+
+		this.context.fillStyle = returnHint ? '#33ff66' : '#0a3d17'
+		this.context.font = '14px monospace'
+		this.context.fillText('> ENTER / ? TO RETURN <', 14, 246)
+	}
+
 	private renderPlayer(): void {
 		if (this.state.deathTimer > 0) {
 			this.context.fillStyle = '#ff3333'
@@ -405,17 +458,27 @@ export class Renderer {
 
 		this.context.fillStyle = '#5a7a5a'
 		this.context.font = '10px monospace'
-		this.context.fillText('P PAUSE // M MUTE // PAD A/B', 14, 192)
+		this.context.fillText('P PAUSE // M MUTE // PAD A/B // ? HELP', 14, 192)
+
+		const blinkLine = Math.floor(Date.now() / 500) % 2 === 0
+
+		this.context.fillStyle = blinkLine ? '#ffcc33' : '#5a3a00'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`DIFFICULTY: ${this.state.difficulty.toUpperCase()}   [\u25C0 \u25B6]`,
+			14,
+			202,
+		)
 
 		const secondsLeft = Math.max(0, Math.ceil(DEMO_DELAY - this.state.demoTimer))
 		const idle = Math.floor(Date.now() / 500) % 2 === 0
 
 		this.context.fillStyle = idle ? '#5a7a5a' : '#2a3a2a'
-		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 202)
+		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 216)
 
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
-		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 212)
+		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 228)
 	}
 
 	private renderVictory(): void {

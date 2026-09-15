@@ -1,6 +1,7 @@
 import { Player } from './player'
 import { Renderer } from './renderer'
 import {
+	type Difficulty,
 	type GameState,
 	type ScoreEntry,
 } from './game-state'
@@ -39,8 +40,22 @@ const MAX_SCORES = 5
 const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
 const MUTED_KEY = 'maze-muted'
+const DIFFICULTY_KEY = 'maze-difficulty'
 const INITIALS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PAUSE_KEYS = new Set(['p', 'P', 'Escape'])
+
+interface DifficultyConfig {
+	lives: number
+	speedScale: number
+}
+
+const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
+	easy: { lives: 5, speedScale: 1.2 },
+	normal: { lives: 3, speedScale: 1 },
+	ranked: { lives: 2, speedScale: 0.85 },
+}
+
+const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'normal', 'ranked']
 
 const DIRECTION_BY_KEY: Record<string, Point> = {
 	ArrowUp: { x: 0, y: -1 },
@@ -80,6 +95,8 @@ export class Game {
 		invincible: 0,
 		flash: 0,
 		muted: false,
+		difficulty: 'normal',
+		gamepadConnected: false,
 		introTimer: 0,
 		deathTimer: 0,
 		shake: 0,
@@ -99,6 +116,14 @@ export class Game {
 		return Math.max(6, 18 - (this.state.session - 1) * 2)
 	}
 
+	private get maxLives(): number {
+		return DIFFICULTIES[this.state.difficulty].lives
+	}
+
+	private get difficultyScale(): number {
+		return DIFFICULTIES[this.state.difficulty].speedScale
+	}
+
 	private maze!: Maze
 	private player!: Player
 	private enemies: Enemy[] = []
@@ -110,6 +135,7 @@ export class Game {
 		this.context = context
 		this.state.muted = this.loadMuted()
 		this.audio.setMuted(this.state.muted)
+		this.state.difficulty = this.loadDifficulty()
 		this.state.hiScore = this.loadHiScore()
 		this.createGame()
 		this.createRenderer()
@@ -154,6 +180,7 @@ export class Game {
 		this.playerMoveTimer = 0
 
 		this.state.status = 'playing'
+		this.state.lives = this.maxLives
 		this.state.dots = this.maze.dotsRemaining
 		this.state.fright = 0
 		this.state.freeze = 0
@@ -221,6 +248,7 @@ export class Game {
 		this.lastTime = time
 
 		this.gamepad.update()
+		this.state.gamepadConnected = this.gamepad.isConnected
 		this.update(deltaTime)
 		this.renderer.render()
 		this.hud.update(this.state)
@@ -327,7 +355,6 @@ export class Game {
 		this.state.demoTimer = 0
 		this.state.session = 1
 		this.state.score = 0
-		this.state.lives = MAX_LIVES
 		this.botPathfinder = new Pathfinder((position) =>
 			this.maze.isWalkable(position),
 		)
@@ -525,8 +552,37 @@ export class Game {
 
 		switch (this.state.status) {
 			case 'title':
+				if (isHelpKey(event.key)) {
+					this.state.status = 'help'
+					return
+				}
+
 				if (isActionKey(event.key)) {
 					this.newGame()
+					return
+				}
+
+				const titleStep = difficultyStep(event.key)
+
+				if (titleStep !== 0) {
+					this.cycleDifficulty(titleStep)
+				}
+				return
+
+			case 'help':
+				if (
+					isHelpKey(event.key) ||
+					isActionKey(event.key) ||
+					PAUSE_KEYS.has(event.key)
+				) {
+					this.state.status = 'title'
+					return
+				}
+
+				const helpStep = difficultyStep(event.key)
+
+				if (helpStep !== 0) {
+					this.cycleDifficulty(helpStep)
 				}
 				return
 
@@ -588,6 +644,30 @@ export class Game {
 			return localStorage.getItem(MUTED_KEY) === '1'
 		} catch {
 			return false
+		}
+	}
+
+	private cycleDifficulty(step: number): void {
+		const index = DIFFICULTY_ORDER.indexOf(this.state.difficulty)
+		const next =
+			DIFFICULTY_ORDER[(index + step + DIFFICULTY_ORDER.length) % DIFFICULTY_ORDER.length]
+
+		this.state.difficulty = next
+
+		try {
+			localStorage.setItem(DIFFICULTY_KEY, next)
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadDifficulty(): Difficulty {
+		try {
+			const stored = localStorage.getItem(DIFFICULTY_KEY)
+
+			return stored === 'easy' || stored === 'ranked' ? stored : 'normal'
+		} catch {
+			return 'normal'
 		}
 	}
 
@@ -936,7 +1016,6 @@ export class Game {
 	private newGame(): void {
 		this.state.session = 1
 		this.state.score = 0
-		this.state.lives = MAX_LIVES
 		this.createGame()
 		this.createRenderer()
 		this.state.introTimer = INTRO_DURATION
@@ -945,7 +1024,6 @@ export class Game {
 
 	private nextSession(): void {
 		this.state.session += 1
-		this.state.lives = MAX_LIVES
 		this.createGame()
 		this.createRenderer()
 		this.state.introTimer = INTRO_DURATION
@@ -1040,7 +1118,10 @@ export class Game {
 	}
 
 	private get enemyInterval(): number {
-		return Math.max(140, 260 - (this.state.session - 1) * 20)
+		return Math.max(
+			140,
+			Math.floor((260 - (this.state.session - 1) * 20) * this.difficultyScale),
+		)
 	}
 
 	private get hunterInterval(): number {
@@ -1048,7 +1129,10 @@ export class Game {
 	}
 
 	private get ghostInterval(): number {
-		return Math.max(280, 500 - (this.state.session - 1) * 40)
+		return Math.max(
+			280,
+			Math.floor((500 - (this.state.session - 1) * 40) * this.difficultyScale),
+		)
 	}
 
 	private findEnemyStarts(count: number): Point[] {
@@ -1128,6 +1212,22 @@ export class Game {
 
 function isActionKey(key: string): boolean {
 	return key === 'Enter' || key === ' '
+}
+
+function isHelpKey(key: string): boolean {
+	return key === '?' || key === 'h' || key === 'H'
+}
+
+function difficultyStep(key: string): number {
+	if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+		return -1
+	}
+
+	if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+		return 1
+	}
+
+	return 0
 }
 
 function directionKey(direction: Point): string | null {

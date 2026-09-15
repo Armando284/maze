@@ -1,4 +1,12 @@
-export type GameStatus = 'title' | 'playing' | 'paused' | 'won' | 'gameover'
+export type GameStatus =
+	| 'title'
+	| 'playing'
+	| 'paused'
+	| 'won'
+	| 'gameover'
+	| 'help'
+
+export type Difficulty = 'easy' | 'normal' | 'ranked'
 
 export interface ScoreEntry {
 	name: string
@@ -36,6 +44,8 @@ export interface GameState {
 	invincible: number
 	flash: number
 	muted: boolean
+	difficulty: Difficulty
+	gamepadConnected: boolean
 	introTimer: number
 	deathTimer: number
 	shake: number

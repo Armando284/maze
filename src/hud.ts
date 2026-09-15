@@ -6,6 +6,7 @@ const STATUS_TEXT: Record<GameStatus, string> = {
 	paused: 'PAUSED',
 	won: 'ACCESS GRANTED',
 	gameover: 'GAME OVER',
+	help: 'HELP',
 }
 
 function element(id: string): HTMLElement {
@@ -26,6 +27,7 @@ export class Hud {
 	private readonly fright: HTMLElement
 	private readonly lives: HTMLElement
 	private readonly mute: HTMLElement
+	private readonly pad: HTMLElement
 	private readonly status: HTMLElement
 
 	constructor() {
@@ -36,6 +38,7 @@ export class Hud {
 		this.fright = element('fright')
 		this.lives = element('lives')
 		this.mute = element('mute')
+		this.pad = element('pad')
 		this.status = element('status')
 	}
 
@@ -52,6 +55,7 @@ export class Hud {
 					: ''
 		this.lives.textContent = '@'.repeat(Math.max(0, state.lives))
 		this.mute.textContent = state.muted ? 'MUTE' : ''
+		this.pad.textContent = state.gamepadConnected ? 'PAD' : ''
 		this.status.textContent =
 			state.status === 'playing' && state.deathTimer > 0
 				? 'SYSTEM FAILURE'

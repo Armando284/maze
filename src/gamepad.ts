@@ -25,6 +25,11 @@ export class GamepadInput {
 	private readonly pressedButtons = new Set<number>()
 	private lastDirection: [number, number] = [0, 0]
 	private lastTimestamp = 0
+	private connected = false
+
+	get isConnected(): boolean {
+		return this.connected
+	}
 
 	constructor(
 		private readonly onDown: (key: string) => void,
@@ -33,6 +38,7 @@ export class GamepadInput {
 
 	update(): void {
 		const gamepad = this.findGamepad()
+		this.connected = gamepad !== null
 
 		if (!gamepad || gamepad.timestamp === this.lastTimestamp) {
 			return

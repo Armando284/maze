@@ -21,6 +21,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 | **7** | Attract mode: demo autoplay con bot (BFS a bits/píldoras/exit), contador en el título, "DEMO MODE" y corte con cualquier tecla | ✅ |
 | **8** | Enemigos y dificultad: sesión 1 patrullan (sin cazar), caza desde S2, **HUNTER** naranja y veloz desde S3 (+300), GLITCH empieza más cerca (S+), velocidad progresiva | ✅ |
 | **9** | Nuevas mecánicas: píldora **FREEZE** `*` (congela enemigos), **1UP** `1` (rara, +1 vida), **teletransportes** `T` (pares), combo de bits (×2..×5) | ✅ |
+| **10** | Ayuda y opciones: pantalla **HELP** desde el título (`?`/`H`), selector de **dificultad** FÁCIL/NORMAL/RANKED (vidas y velocidad, persistente), indicador de **gamepad** conectado en HUD y en HELP | ✅ |
 
 ## Decisiones técnicas y convenciones
 
@@ -51,13 +52,7 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 
 ## Roadmap futuro
 
-Prioridad sugerida: 10 → 11 (11 también vale como pulido transversal).
-
-### Fase 10 — Pantalla de ayuda / opciones
-- Pantalla instrucciones accesible desde el título ("?"), selector de dificultad
-  (FÁCIL/NORMAL/RANKED: vidas o velocidad), indicador de conexión de gamepad en HUD.
-- Ficheros: nuevo estado en `game-state.ts`, `renderer.ts`, `hud.ts`.
-- Verificación: navegar menús con teclado y mando.
+Prioridad sugerida: 11 (vale también como pulido transversal).
 
 ### Fase 11 — Rendimiento y pulido final
 - Cachear el fondo estático (laberinto + bits) en un canvas offscreen y redibujar
