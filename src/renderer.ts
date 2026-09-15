@@ -2,19 +2,23 @@ import type { GameState } from './game-state'
 import { CELL_SIZE, toPixel } from './grid'
 import { MAZE_WIDTH, MAZE_HEIGHT, getCell } from './maze'
 import { Player } from './player'
+import { Enemy } from './enemy'
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
 	private readonly player: Player
 	private readonly state: GameState
+	private readonly enemy: Enemy
 
 	constructor(
 		context: CanvasRenderingContext2D,
 		player: Player,
+		enemy: Enemy,
 		state: GameState,
 	) {
 		this.context = context
 		this.player = player
+		this.enemy = enemy
 		this.state = state
 	}
 
@@ -27,8 +31,9 @@ export class Renderer {
 		}
 
 		this.renderMaze()
-		this.renderPlayer()
 		this.renderExit()
+		this.renderEnemy()
+		this.renderPlayer()
 	}
 
 	private clear(): void {
@@ -103,5 +108,18 @@ export class Renderer {
 		this.context.fillText('PRESS ENTER TO PLAY AGAIN', 160, 115)
 
 		this.context.textAlign = 'left'
+	}
+
+	private renderEnemy(): void {
+		const position = toPixel(this.enemy.position)
+
+		this.context.fillStyle = '#ff3333'
+
+		this.context.fillRect(
+			position.x + 2,
+			position.y + 2,
+			CELL_SIZE - 4,
+			CELL_SIZE - 4,
+		)
 	}
 }
