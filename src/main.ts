@@ -4,6 +4,7 @@ import { Boot } from './boot'
 import { Visualizer } from './visualizer'
 import { CELL_SIZE } from './grid'
 import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
+import { TouchControls } from './touch-controls'
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')
 if (!canvas) {
@@ -31,3 +32,9 @@ boot.start(() => {
 
 	new Visualizer(game.getAudio()).start()
 })
+
+const touchRoot = document.getElementById('touch-controls')
+
+if (touchRoot) {
+	new TouchControls(touchRoot)
+}

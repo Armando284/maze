@@ -215,10 +215,6 @@ export class Game {
 	}
 
 	private handleTouchStart(event: TouchEvent): void {
-		if (this.state.status !== 'playing') {
-			return
-		}
-
 		const touch = event.touches[0]
 
 		if (!touch) {
@@ -248,6 +244,11 @@ export class Game {
 		const absY = Math.abs(dy)
 
 		if (Math.max(absX, absY) < 30) {
+			this.handleCanvasTap()
+			return
+		}
+
+		if (this.state.status !== 'playing') {
 			return
 		}
 
@@ -262,6 +263,23 @@ export class Game {
 
 		this.simulateKey('keydown', key)
 		window.setTimeout(() => this.simulateKey('keyup', key), 60)
+	}
+
+	private handleCanvasTap(): void {
+		if (this.state.status === 'playing') {
+			return
+		}
+
+		if (this.state.status === 'keys' && this.state.keysAwaiting) {
+			return
+		}
+
+		if (this.state.status === 'paused') {
+			this.simulateKey('keydown', 'p')
+			return
+		}
+
+		this.simulateKey('keydown', 'Enter')
 	}
 
 	private simulateKey(type: 'keydown' | 'keyup', key: string): void {

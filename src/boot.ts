@@ -67,6 +67,7 @@ export class Boot {
 	start(onComplete: () => void): void {
 		this.onComplete = onComplete
 		window.addEventListener('keydown', this.handleKeyDown)
+		this.overlay.addEventListener('pointerdown', this.handleKeyDown)
 		this.typeNextChar()
 	}
 
@@ -99,6 +100,7 @@ export class Boot {
 
 		this.done = true
 		window.removeEventListener('keydown', this.handleKeyDown)
+		this.overlay.removeEventListener('pointerdown', this.handleKeyDown)
 		window.clearTimeout(this.timer)
 
 		this.overlay.classList.add('boot-hidden')
