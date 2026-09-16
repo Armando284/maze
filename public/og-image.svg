@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1a0f"/>
+      <stop offset="0.5" stop-color="#040a06"/>
+      <stop offset="1" stop-color="#02150a"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1200" height="630" fill="url(#vignette)"/>
+  <g filter="url(#glow)">
+    <rect x="1" y="1" width="30" height="2" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="1" y="29" width="30" height="2" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="1" y="1" width="2" height="30" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="29" y="1" width="2" height="30" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="15" y="3" width="2" height="7" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="15" y="22" width="2" height="7" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="8" y="15" width="2" height="9" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="22" y="15" width="2" height="9" fill="#33ff66" transform="translate(440,80) scale(10)"/>
+    <rect x="7" y="6" width="2" height="2" fill="#46e07a" transform="translate(440,80) scale(10)"/>
+    <rect x="23" y="6" width="2" height="2" fill="#46e07a" transform="translate(440,80) scale(10)"/>
+    <rect x="5" y="19" width="2" height="2" fill="#46e07a" transform="translate(440,80) scale(10)"/>
+    <rect x="25" y="19" width="2" height="2" fill="#46e07a" transform="translate(440,80) scale(10)"/>
+  </g>
+  <text x="600" y="500" text-anchor="middle" font-family="'Source Code Pro','DejaVu Sans Mono',monospace" font-size="96" font-weight="700" fill="#33ff66" filter="url(#glow)">MAZE.EXE</text>
+  <text x="600" y="552" text-anchor="middle" font-family="'Source Code Pro','DejaVu Sans Mono',monospace" font-size="34" fill="#7dffa4">RETRO TERMINAL MAZE ARCADE &#183; COLLECT BITS &#183; AVOID THE DAEMONS</text>
+  <text x="40" y="600" font-family="'Source Code Pro','DejaVu Sans Mono',monospace" font-size="30" fill="#1d7a3d">C:\&gt; INSERT COIN</text>
+  <text x="1180" y="600" text-anchor="end" font-family="'Source Code Pro','DejaVu Sans Mono',monospace" font-size="30" fill="#1d7a3d">PLAYER 1 READY</text>
+</svg>
