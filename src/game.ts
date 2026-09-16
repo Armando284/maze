@@ -97,7 +97,6 @@ const DIRECTION_BY_KEY: Record<string, Point> = {
 export class Game {
 	private readonly context: CanvasRenderingContext2D
 	private lastTime = 0
-	private animationFrame = 0
 	private playerMoveTimer = 0
 	private nextBounceAt = 0
 	private started = false
@@ -361,7 +360,7 @@ export class Game {
 	start(): void {
 		this.started = true
 		this.audio.startMusic()
-		this.animationFrame = requestAnimationFrame((time) => this.loop(time))
+		requestAnimationFrame((time) => this.loop(time))
 	}
 
 	private loop(time: number): void {
@@ -374,9 +373,7 @@ export class Game {
 		this.renderer.render()
 		this.hud.update(this.state)
 
-		this.animationFrame = requestAnimationFrame((nextTime) =>
-			this.loop(nextTime),
-		)
+		requestAnimationFrame((nextTime) => this.loop(nextTime))
 	}
 
 	private update(deltaTime: number): void {
@@ -971,7 +968,7 @@ export class Game {
 		}
 
 		if (value === 1) {
-			delete style.zoom
+			style.zoom = ''
 		} else {
 			style.zoom = String(value)
 		}

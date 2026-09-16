@@ -32,10 +32,13 @@ export class GamepadInput {
 		return this.connected
 	}
 
-	constructor(
-		private readonly onDown: (key: string) => void,
-		private readonly onUp: (key: string) => void,
-	) {}
+	private readonly onDown: (key: string) => void
+	private readonly onUp: (key: string) => void
+
+	constructor(onDown: (key: string) => void, onUp: (key: string) => void) {
+		this.onDown = onDown
+		this.onUp = onUp
+	}
 
 	update(): void {
 		const gamepad = this.findGamepad()

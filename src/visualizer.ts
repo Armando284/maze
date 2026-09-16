@@ -11,11 +11,14 @@ const SIGNAL_TIMEOUT = 0.6
 export class Visualizer {
 	private readonly context: CanvasRenderingContext2D
 	private readonly data = new Uint8Array(SAMPLE_COUNT)
+	private readonly audio: Audio
 	private level = 0
 	private lastSignal = 0
 	private running = false
 
-	constructor(private readonly audio: Audio) {
+	constructor(audio: Audio) {
+		this.audio = audio
+
 		const canvas = document.querySelector<HTMLCanvasElement>('#visualizer')
 
 		if (!canvas) {

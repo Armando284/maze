@@ -214,7 +214,6 @@ export class Renderer {
 
 		for (let i = 0; i < 60; i++) {
 			const x = (i * 83 + 9) % CANVAS_WIDTH
-			const speed = 16 + ((i * 37) % 30)
 			const y = ((now * 0.01 + i * 131) % (CANVAS_HEIGHT + 40)) - 20
 			const glyph =
 				'0123456789ABCDEF'[(i * 5 + Math.floor(now / 400)) % 16]
