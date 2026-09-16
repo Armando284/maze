@@ -293,10 +293,14 @@ canvas {
   }
 
   #fright {
-    min-width: 0;
+    flex: 0 0 76px;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   #combo {
-    min-width: 0;
+    flex: 0 0 80px;
+    white-space: nowrap;
+    overflow: hidden;
   }
 }
