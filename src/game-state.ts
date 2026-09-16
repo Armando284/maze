@@ -5,8 +5,24 @@ export type GameStatus =
 	| 'won'
 	| 'gameover'
 	| 'help'
+	| 'achievements'
 
 export type Difficulty = 'easy' | 'normal' | 'ranked'
+
+export interface PlayStats {
+	bits: number
+	daemons: number
+	ghosts: number
+	freezeUses: number
+	teleportUses: number
+	pills: number
+	maxCombo: number
+}
+
+export interface AchievementToast {
+	title: string
+	life: number
+}
 
 export interface ScoreEntry {
 	name: string
@@ -46,6 +62,10 @@ export interface GameState {
 	muted: boolean
 	difficulty: Difficulty
 	gamepadConnected: boolean
+	stats: PlayStats
+	unlocked: string[]
+	lostLifeThisSession: boolean
+	achieveToast: AchievementToast | null
 	introTimer: number
 	deathTimer: number
 	shake: number

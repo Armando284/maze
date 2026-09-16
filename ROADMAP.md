@@ -8,7 +8,7 @@ generado con DFS, recoge **BITS** (`·`), esquiva **DAEMONS** (`&`) que lo persi
 el **EXIT** (`E`) al final de la sesión para la siguiente ronda de dificultad
 creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace.
 
-## Estado actual — Fases 1 a 6 completadas
+## Estado actual — Fases 1 a 12 completadas
 
 | Fase | Scope | Estado |
 | --- | --- | --- |
@@ -22,6 +22,8 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 | **8** | Enemigos y dificultad: sesión 1 patrullan (sin cazar), caza desde S2, **HUNTER** naranja y veloz desde S3 (+300), GLITCH empieza más cerca (S+), velocidad progresiva | ✅ |
 | **9** | Nuevas mecánicas: píldora **FREEZE** `*` (congela enemigos), **1UP** `1` (rara, +1 vida), **teletransportes** `T` (pares), combo de bits (×2..×5) | ✅ |
 | **10** | Ayuda y opciones: pantalla **HELP** desde el título (`?`/`H`), selector de **dificultad** FÁCIL/NORMAL/RANKED (vidas y velocidad, persistente), indicador de **gamepad** conectado en HUD y en HELP | ✅ |
+| **11** | Rendimiento: fondo estático (muros + bits + teletransportes) cacheado en canvas offscreen con limpieza incremental por celda, partículas/popups compactados in-place (sin realloc) y con cap de 120/30 | ✅ |
+| **12** | **Logros** (11): estadísticas persistentes (`maze-stats`, `maze-achievements`), desbloqueo en vivo con toast dorado, pantalla colección tras HELP (`?`/`H`/botón Y) y contador en el título | ✅ |
 
 ## Decisiones técnicas y convenciones
 
@@ -52,18 +54,11 @@ creciente. Estética de terminal fósforo verde + overlay CRT + fuente monospace
 
 ## Roadmap futuro
 
-Prioridad sugerida: 11 (vale también como pulido transversal).
-
-### Fase 11 — Rendimiento y pulido final
-- Cachear el fondo estático (laberinto + bits) en un canvas offscreen y redibujar
-  solo las celdas que cambian al recoger / pisar.
-- Reutilizar objetos de partículas/popups (evitar GC), capar partículas en pantalla.
-- Verificación: perfil de FPS en un laberinto casi vacío (sin dots) se mantiene a 60.
+Prioridad sugerida: ideas abajo (ninguna fase planificada; el juego está feature-complete).
 
 ### Ideas a considerar más adelante
 - Modo 2 jugadores (turnos) aprovechando recuerdos locales por jugador.
 - Jingle estilo arranque de Windows/AMIGA en el boot.
-- Logros/trofeos (parciales de bits, daemons comidos, sesiones).
 - Accesibilidad: mapeado de teclas y DPI de la fuente.
 
 ## Nota de despliegue

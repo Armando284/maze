@@ -11,6 +11,7 @@ const BUTTON_MAP: ReadonlyArray<[number, string]> = [
 	[0, 'Enter'],
 	[9, 'Enter'],
 	[1, 'Escape'],
+	[3, '?'],
 	[8, 'm'],
 ]
 

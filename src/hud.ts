@@ -7,6 +7,7 @@ const STATUS_TEXT: Record<GameStatus, string> = {
 	won: 'ACCESS GRANTED',
 	gameover: 'GAME OVER',
 	help: 'HELP',
+	achievements: 'ACHIEVEMENTS',
 }
 
 function element(id: string): HTMLElement {

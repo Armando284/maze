@@ -1,4 +1,5 @@
 import type { GameState } from './game-state'
+import { ALL_ACHIEVEMENTS } from './achievements'
 import { CELL_SIZE, toPixel, type Point } from './grid'
 import { MAZE_WIDTH, MAZE_HEIGHT, Maze } from './maze'
 import { Player } from './player'
@@ -24,6 +25,8 @@ const DEMO_DELAY = 12
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
+	private readonly background: HTMLCanvasElement
+	private readonly backgroundContext: CanvasRenderingContext2D | null
 	private readonly player: Player
 	private readonly state: GameState
 	private readonly enemies: readonly Enemy[]
@@ -44,6 +47,67 @@ export class Renderer {
 		this.enemies = enemies
 		this.ghost = ghost
 		this.state = state
+
+		this.background = document.createElement('canvas')
+		this.background.width = CANVAS_WIDTH
+		this.background.height = CANVAS_HEIGHT
+		this.backgroundContext = this.background.getContext('2d')
+		this.buildBackground()
+	}
+
+	private buildBackground(): void {
+		const context = this.backgroundContext
+
+		if (!context) {
+			return
+		}
+
+		context.fillStyle = '#000'
+		context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+
+		context.font = `${CELL_SIZE}px monospace`
+		context.textBaseline = 'top'
+
+		for (let y = 0; y < MAZE_HEIGHT; y++) {
+			for (let x = 0; x < MAZE_WIDTH; x++) {
+				const cell = this.maze.getCell({ x, y })
+
+				if (cell === 'wall') {
+					context.fillStyle = '#33ff66'
+					this.renderBackgroundCharacter(SYMBOLS.wall, x, y)
+				} else if (cell === 'dot') {
+					context.fillStyle = '#1d6b33'
+					this.renderBackgroundCharacter(SYMBOLS.dot, x, y)
+				} else if (cell === 'teleport') {
+					context.fillStyle = '#cc66ff'
+					this.renderBackgroundCharacter(SYMBOLS.teleport, x, y)
+				}
+			}
+		}
+	}
+
+	private renderBackgroundCharacter(character: string, x: number, y: number): void {
+		this.backgroundContext?.fillText(character, x * CELL_SIZE, y * CELL_SIZE)
+	}
+
+	clearCell(point: Point): void {
+		const context = this.backgroundContext
+
+		if (!context) {
+			return
+		}
+
+		context.fillStyle = '#000'
+		context.fillRect(
+			point.x * CELL_SIZE,
+			point.y * CELL_SIZE,
+			CELL_SIZE,
+			CELL_SIZE,
+		)
+	}
+
+	private drawBackground(): void {
+		this.context.drawImage(this.background, 0, 0)
 	}
 
 	render(): void {
@@ -56,6 +120,10 @@ export class Renderer {
 
 			case 'help':
 				this.renderHelp()
+				return
+
+			case 'achievements':
+				this.renderAchievements()
 				return
 
 			case 'paused':
@@ -110,8 +178,7 @@ export class Renderer {
 		this.context.font = `${CELL_SIZE}px monospace`
 		this.context.textBaseline = 'top'
 
-		this.renderMaze()
-		this.renderBits()
+		this.drawBackground()
 		this.renderPills()
 		this.renderSpecialCells()
 		this.renderExit()
@@ -132,6 +199,43 @@ export class Renderer {
 		if (this.state.shake > 0) {
 			this.context.restore()
 		}
+
+		this.renderAchievementToast()
+	}
+
+	private renderAchievementToast(): void {
+		const toast = this.state.achieveToast
+
+		if (!toast || toast.life <= 0) {
+			return
+		}
+
+		const fade = Math.min(1, toast.life * 3)
+		const blink = Math.floor(Date.now() / 250) % 2 === 0
+
+		this.context.globalAlpha = fade
+		this.context.fillStyle = 'rgba(0, 0, 0, 0.62)'
+		this.context.fillRect(0, 0, CANVAS_WIDTH, 44)
+
+		this.context.textAlign = 'center'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = '#ffcc33'
+		this.context.font = '10px monospace'
+		this.context.fillText(
+			blink ? '*** ACHIEVEMENT UNLOCKED ***' : 'ACHIEVEMENT UNLOCKED',
+			CANVAS_WIDTH / 2,
+			7,
+		)
+
+		this.withGlow(6, '#ffcc33', () => {
+			this.context.fillStyle = '#ffffff'
+			this.context.font = '14px monospace'
+			this.context.fillText(`* ${toast.title} *`, CANVAS_WIDTH / 2, 22)
+		})
+
+		this.context.globalAlpha = 1
+		this.context.textAlign = 'left'
 	}
 
 	private withGlow(blur: number, color: string, draw: () => void): void {
@@ -234,37 +338,6 @@ export class Renderer {
 		this.context.fillText(character, position.x, position.y)
 	}
 
-	private renderMaze(): void {
-		for (let y = 0; y < MAZE_HEIGHT; y++) {
-			for (let x = 0; x < MAZE_WIDTH; x++) {
-				const cell = this.maze.getCell({ x, y })
-
-				if (cell === 'wall') {
-					this.renderWall(x, y)
-				}
-			}
-		}
-	}
-
-	private renderWall(x: number, y: number): void {
-		this.context.fillStyle = '#33ff66'
-		this.renderCharacter(SYMBOLS.wall, { x, y })
-	}
-
-	private renderBits(): void {
-		this.context.fillStyle = '#1d6b33'
-
-		for (let y = 0; y < MAZE_HEIGHT; y++) {
-			for (let x = 0; x < MAZE_WIDTH; x++) {
-				const cell = this.maze.getCell({ x, y })
-
-				if (cell === 'dot') {
-					this.renderCharacter(SYMBOLS.dot, { x, y })
-				}
-			}
-		}
-	}
-
 	private renderPills(): void {
 		const blink = Math.floor(Date.now() / 450) % 2 === 0
 
@@ -300,9 +373,6 @@ export class Renderer {
 						this.context.fillStyle = blink ? '#ffcc33' : '#5a4a00'
 						this.renderCharacter(SYMBOLS.extra, { x, y })
 					})
-				} else if (cell === 'teleport') {
-					this.context.fillStyle = '#cc66ff'
-					this.renderCharacter(SYMBOLS.teleport, { x, y })
 				}
 			}
 		}
@@ -396,7 +466,48 @@ export class Renderer {
 
 		this.context.fillStyle = returnHint ? '#33ff66' : '#0a3d17'
 		this.context.font = '14px monospace'
-		this.context.fillText('> ENTER / ? TO RETURN <', 14, 246)
+		this.context.fillText('> ENTER / ? SEE ACHIEVEMENTS <', 14, 246)
+	}
+
+	private renderAchievements(): void {
+		const backHint = Math.floor(Date.now() / 400) % 2 === 0
+		const unlockedCount = this.state.unlocked.length
+
+		this.context.textAlign = 'left'
+		this.context.textBaseline = 'top'
+
+		this.context.fillStyle = '#ffcc33'
+		this.context.font = '22px monospace'
+		this.context.fillText('ACHIEVEMENTS', 14, 20)
+
+		ALL_ACHIEVEMENTS.forEach((achievement, index) => {
+			const unlocked = this.state.unlocked.includes(achievement.id)
+			const y = 58 + index * 17
+
+			this.context.fillStyle = unlocked ? '#ffcc33' : '#2a4a2a'
+			this.context.font = '12px monospace'
+			this.context.fillText(
+				`${unlocked ? ' *' : '  '} ${achievement.name}`,
+				14,
+				y,
+			)
+
+			this.context.fillStyle = unlocked ? '#8a7a3a' : '#1d3a1d'
+			this.context.font = '10px monospace'
+			this.context.fillText(achievement.description, 148, y + 2)
+		})
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`${unlockedCount}/${ALL_ACHIEVEMENTS.length} UNLOCKED`,
+			14,
+			246,
+		)
+
+		this.context.fillStyle = backHint ? '#33ff66' : '#0a3d17'
+		this.context.font = '14px monospace'
+		this.context.fillText('> ENTER / ? TO RETURN <', 14, 266)
 	}
 
 	private renderPlayer(): void {
@@ -458,7 +569,7 @@ export class Renderer {
 
 		this.context.fillStyle = '#5a7a5a'
 		this.context.font = '10px monospace'
-		this.context.fillText('P PAUSE // M MUTE // PAD A/B // ? HELP', 14, 192)
+		this.context.fillText('P PAUSE // M MUTE // PAD // ? HELP+ACHEV', 14, 192)
 
 		const blinkLine = Math.floor(Date.now() / 500) % 2 === 0
 
@@ -470,15 +581,23 @@ export class Renderer {
 			202,
 		)
 
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`ACHIEVEMENTS ${this.state.unlocked.length}/${ALL_ACHIEVEMENTS.length}`,
+			14,
+			214,
+		)
+
 		const secondsLeft = Math.max(0, Math.ceil(DEMO_DELAY - this.state.demoTimer))
 		const idle = Math.floor(Date.now() / 500) % 2 === 0
 
 		this.context.fillStyle = idle ? '#5a7a5a' : '#2a3a2a'
-		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 216)
+		this.context.fillText(`AUTO-DEMO IN ${secondsLeft}`, 14, 226)
 
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
-		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 228)
+		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 238)
 	}
 
 	private renderVictory(): void {

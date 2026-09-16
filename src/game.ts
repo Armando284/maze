@@ -1,8 +1,10 @@
 import { Player } from './player'
+import { ALL_ACHIEVEMENTS } from './achievements'
 import { Renderer } from './renderer'
 import {
 	type Difficulty,
 	type GameState,
+	type PlayStats,
 	type ScoreEntry,
 } from './game-state'
 import { Maze } from './maze'
@@ -34,6 +36,9 @@ const INTRO_DURATION = 1.4
 const POPUP_LIFE = 0.9
 const DEATH_DURATION = 0.9
 const SHAKE_MAX = 10
+const MAX_PARTICLES = 120
+const MAX_POPUPS = 30
+const ACHIEVE_TOAST_DURATION = 3.5
 const DEMO_DELAY = 12
 const DEMO_RESULT_DELAY = 4
 const MAX_SCORES = 5
@@ -41,8 +46,20 @@ const SCORES_KEY = 'maze-scores'
 const HI_SCORE_KEY = 'maze-hi-score'
 const MUTED_KEY = 'maze-muted'
 const DIFFICULTY_KEY = 'maze-difficulty'
+const STATS_KEY = 'maze-stats'
+const ACHIEVEMENTS_KEY = 'maze-achievements'
 const INITIALS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const PAUSE_KEYS = new Set(['p', 'P', 'Escape'])
+
+const EMPTY_STATS: PlayStats = {
+	bits: 0,
+	daemons: 0,
+	ghosts: 0,
+	freezeUses: 0,
+	teleportUses: 0,
+	pills: 0,
+	maxCombo: 0,
+}
 
 interface DifficultyConfig {
 	lives: number
@@ -97,6 +114,10 @@ export class Game {
 		muted: false,
 		difficulty: 'normal',
 		gamepadConnected: false,
+		stats: { ...EMPTY_STATS },
+		unlocked: [],
+		lostLifeThisSession: false,
+		achieveToast: null,
 		introTimer: 0,
 		deathTimer: 0,
 		shake: 0,
@@ -137,6 +158,8 @@ export class Game {
 		this.audio.setMuted(this.state.muted)
 		this.state.difficulty = this.loadDifficulty()
 		this.state.hiScore = this.loadHiScore()
+		this.state.stats = this.loadStats()
+		this.state.unlocked = this.loadUnlocked()
 		this.createGame()
 		this.createRenderer()
 		this.state.status = 'title'
@@ -182,6 +205,8 @@ export class Game {
 		this.state.status = 'playing'
 		this.state.lives = this.maxLives
 		this.state.dots = this.maze.dotsRemaining
+		this.state.lostLifeThisSession = false
+		this.state.achieveToast = null
 		this.state.fright = 0
 		this.state.freeze = 0
 		this.state.invincible = 0
@@ -401,33 +426,49 @@ export class Game {
 	}
 
 	private agePopups(deltaTime: number): void {
-		for (const popup of this.state.popups) {
-			popup.life -= deltaTime / 1000
+		const popups = this.state.popups
+		const step = deltaTime / 1000
+		let alive = 0
+
+		for (const popup of popups) {
+			popup.life -= step
+
+			if (popup.life > 0) {
+				popups[alive] = popup
+				alive++
+			}
 		}
 
-		if (this.state.popups.length > 0) {
-			this.state.popups = this.state.popups.filter(
-				(popup) => popup.life > 0,
-			)
-		}
+		popups.length = alive
 	}
 
 	private addPopup(text: string, x: number, y: number, color: string): void {
-		this.state.popups.push({ text, x, y, life: POPUP_LIFE, color })
+		const popups = this.state.popups
+
+		if (popups.length >= MAX_POPUPS) {
+			popups.shift()
+		}
+
+		popups.push({ text, x, y, life: POPUP_LIFE, color })
 	}
 
 	private ageParticles(deltaTime: number): void {
-		for (const particle of this.state.particles) {
-			particle.life -= deltaTime / 1000
-			particle.x += particle.vx * (deltaTime / 1000)
-			particle.y += particle.vy * (deltaTime / 1000)
+		const particles = this.state.particles
+		const step = deltaTime / 1000
+		let alive = 0
+
+		for (const particle of particles) {
+			particle.life -= step
+			particle.x += particle.vx * step
+			particle.y += particle.vy * step
+
+			if (particle.life > 0) {
+				particles[alive] = particle
+				alive++
+			}
 		}
 
-		if (this.state.particles.length > 0) {
-			this.state.particles = this.state.particles.filter(
-				(particle) => particle.life > 0,
-			)
-		}
+		particles.length = alive
 	}
 
 	private spawnBurst(
@@ -439,6 +480,10 @@ export class Game {
 		size: number,
 	): void {
 		for (let index = 0; index < count; index++) {
+			if (this.state.particles.length >= MAX_PARTICLES) {
+				break
+			}
+
 			const angle = Math.random() * Math.PI * 2
 			const velocity = speed * (0.3 + Math.random() * 0.7)
 
@@ -481,6 +526,17 @@ export class Game {
 
 		if (this.comboTimer === 0) {
 			this.combo = 0
+		}
+
+		if (this.state.achieveToast) {
+			this.state.achieveToast.life = Math.max(
+				0,
+				this.state.achieveToast.life - deltaTime / 1000,
+			)
+
+			if (this.state.achieveToast.life === 0) {
+				this.state.achieveToast = null
+			}
 		}
 	}
 
@@ -572,11 +628,12 @@ export class Game {
 				return
 
 			case 'help':
-				if (
-					isHelpKey(event.key) ||
-					isActionKey(event.key) ||
-					PAUSE_KEYS.has(event.key)
-				) {
+				if (isHelpKey(event.key)) {
+					this.state.status = 'achievements'
+					return
+				}
+
+				if (isActionKey(event.key) || PAUSE_KEYS.has(event.key)) {
 					this.state.status = 'title'
 					return
 				}
@@ -585,6 +642,16 @@ export class Game {
 
 				if (helpStep !== 0) {
 					this.cycleDifficulty(helpStep)
+				}
+				return
+
+			case 'achievements':
+				if (
+					isHelpKey(event.key) ||
+					isActionKey(event.key) ||
+					PAUSE_KEYS.has(event.key)
+				) {
+					this.state.status = 'title'
 				}
 				return
 
@@ -670,6 +737,107 @@ export class Game {
 			return stored === 'easy' || stored === 'ranked' ? stored : 'normal'
 		} catch {
 			return 'normal'
+		}
+	}
+
+	private saveStats(): void {
+		try {
+			localStorage.setItem(STATS_KEY, JSON.stringify(this.state.stats))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadStats(): PlayStats {
+		try {
+			const raw = localStorage.getItem(STATS_KEY)
+
+			if (!raw) {
+				return { ...EMPTY_STATS }
+			}
+
+			const parsed = JSON.parse(raw) as Partial<PlayStats>
+			const stats = { ...EMPTY_STATS }
+
+			for (const key of Object.keys(EMPTY_STATS) as Array<keyof PlayStats>) {
+				const value = parsed[key]
+
+				if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+					stats[key] = value
+				}
+			}
+
+			return stats
+		} catch {
+			return { ...EMPTY_STATS }
+		}
+	}
+
+	private saveUnlocked(): void {
+		try {
+			localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(this.state.unlocked))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadUnlocked(): string[] {
+		try {
+			const raw = localStorage.getItem(ACHIEVEMENTS_KEY)
+
+			if (!raw) {
+				return []
+			}
+
+			const parsed = JSON.parse(raw) as unknown
+
+			if (!Array.isArray(parsed)) {
+				return []
+			}
+
+			const valid = new Set(ALL_ACHIEVEMENTS.map((achievement) => achievement.id))
+
+			return parsed.filter(
+				(value): value is string =>
+					typeof value === 'string' && valid.has(value),
+			)
+		} catch {
+			return []
+		}
+	}
+
+	private unlockAchievement(id: string): void {
+		if (this.state.demo || this.state.unlocked.includes(id)) {
+			return
+		}
+
+		const achievement = ALL_ACHIEVEMENTS.find((entry) => entry.id === id)
+
+		if (!achievement) {
+			return
+		}
+
+		this.state.unlocked.push(id)
+		this.state.achieveToast = {
+			title: achievement.name,
+			life: ACHIEVE_TOAST_DURATION,
+		}
+		this.saveUnlocked()
+	}
+
+	private checkAchievements(): void {
+		if (this.state.demo) {
+			return
+		}
+
+		for (const achievement of ALL_ACHIEVEMENTS) {
+			if (achievement.id === 'undying') {
+				continue
+			}
+
+			if (achievement.condition(this.state.stats, this.state.session)) {
+				this.unlockAchievement(achievement.id)
+			}
 		}
 	}
 
@@ -788,6 +956,7 @@ export class Game {
 		}
 
 		this.state.dots = this.maze.dotsRemaining
+		this.renderer.clearCell(point)
 
 		if (this.comboTimer > 0) {
 			this.combo = Math.min(COMBO_MAX, this.combo + 1)
@@ -800,6 +969,18 @@ export class Game {
 		this.state.score += POINTS_PER_BIT * this.combo
 		this.audio.coin()
 
+		if (!this.state.demo) {
+			const stats = this.state.stats
+			stats.bits += 1
+
+			if (this.combo > stats.maxCombo) {
+				stats.maxCombo = this.combo
+			}
+
+			this.saveStats()
+			this.checkAchievements()
+		}
+
 		if (this.combo >= 3) {
 			this.addPopup(`x${this.combo}`, point.x, point.y - 1, '#ffaa33')
 		}
@@ -810,10 +991,17 @@ export class Game {
 			return
 		}
 
+		this.renderer.clearCell(point)
 		this.state.freeze = FREEZE_DURATION
 		this.audio.freeze()
 		this.addPopup('FROZEN', point.x, point.y, '#66ccff')
 		this.spawnBurst(point.x, point.y, '#66ccff', 10, 2.4, 2.5)
+
+		if (!this.state.demo) {
+			this.state.stats.freezeUses += 1
+			this.saveStats()
+			this.checkAchievements()
+		}
 	}
 
 	private collectExtraAt(point: Point): void {
@@ -821,6 +1009,7 @@ export class Game {
 			return
 		}
 
+		this.renderer.clearCell(point)
 		this.state.lives = Math.min(EXTRA_LIFE_CAP, this.state.lives + 1)
 		this.audio.life()
 		this.addPopup('1UP', point.x, point.y, '#ffcc33')
@@ -838,6 +1027,12 @@ export class Game {
 		this.audio.warp()
 		this.addPopup('WARP', partner.x, partner.y, '#cc66ff')
 		this.spawnBurst(partner.x, partner.y, '#cc66ff', 10, 2.5, 2.5)
+
+		if (!this.state.demo) {
+			this.state.stats.teleportUses += 1
+			this.saveStats()
+			this.checkAchievements()
+		}
 	}
 
 	private collectPill(point: Point): void {
@@ -845,6 +1040,7 @@ export class Game {
 			return
 		}
 
+		this.renderer.clearCell(point)
 		this.state.score += PILL_BONUS
 		this.state.fright = FRIGHT_DURATION
 		this.audio.power()
@@ -855,6 +1051,12 @@ export class Game {
 			enemy.scared = true
 		}
 		this.ghost.scared = true
+
+		if (!this.state.demo) {
+			this.state.stats.pills += 1
+			this.saveStats()
+			this.checkAchievements()
+		}
 	}
 
 	private checkVictory(): boolean {
@@ -876,6 +1078,12 @@ export class Game {
 			)
 			this.updateHiScore()
 			this.audio.victory()
+
+			if (!this.state.lostLifeThisSession) {
+				this.unlockAchievement('undying')
+			}
+
+			this.checkAchievements()
 			return true
 		}
 
@@ -910,6 +1118,7 @@ export class Game {
 
 	private loseLife(): void {
 		this.state.lives--
+		this.state.lostLifeThisSession = true
 		this.state.flash = FLASH_DURATION
 		this.state.shake = SHAKE_MAX
 		this.audio.death()
@@ -976,6 +1185,10 @@ export class Game {
 					3,
 					2.5,
 				)
+
+				if (!this.state.demo) {
+					this.state.stats.daemons += 1
+				}
 				continue
 			}
 
@@ -984,6 +1197,11 @@ export class Game {
 
 		this.enemies.length = 0
 		this.enemies.push(...surviving)
+
+		if (!this.state.demo) {
+			this.saveStats()
+			this.checkAchievements()
+		}
 	}
 
 	private slayGhostIfScared(): void {
@@ -1013,6 +1231,12 @@ export class Game {
 			3.2,
 			3,
 		)
+
+		if (!this.state.demo) {
+			this.state.stats.ghosts += 1
+			this.saveStats()
+			this.checkAchievements()
+		}
 	}
 
 	private newGame(): void {
@@ -1026,6 +1250,7 @@ export class Game {
 
 	private nextSession(): void {
 		this.state.session += 1
+		this.checkAchievements()
 		this.createGame()
 		this.createRenderer()
 		this.state.introTimer = INTRO_DURATION
