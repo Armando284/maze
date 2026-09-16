@@ -30,9 +30,9 @@ export class Ghost {
 		this.moveTimer = 0
 	}
 
-	update(deltaTime: number): void {
+	update(deltaTime: number): boolean {
 		if (this.removed) {
-			return
+			return false
 		}
 
 		this.moveTimer += deltaTime
@@ -40,14 +40,13 @@ export class Ghost {
 		const interval = this.scared ? this.moveInterval * 1.5 : this.moveInterval
 
 		if (this.moveTimer < interval) {
-			return
+			return false
 		}
 
 		this.moveTimer = 0
 
 		if (this.scared) {
-			this.wander()
-			return
+			return this.wander()
 		}
 
 		const path = this.pathfinder.findPath(
@@ -56,10 +55,11 @@ export class Ghost {
 		)
 
 		if (path.length < 2) {
-			return
+			return true
 		}
 
 		this.position = { ...path[1] }
+		return false
 	}
 
 	isTouchingPlayer(): boolean {
@@ -69,7 +69,7 @@ export class Ghost {
 		)
 	}
 
-	private wander(): void {
+	private wander(): boolean {
 		const options = shuffle(DIRECTIONS)
 			.map((direction) => ({
 				x: this.position.x + direction.x,
@@ -78,10 +78,11 @@ export class Ghost {
 			.filter((position) => this.canMove(position))
 
 		if (options.length === 0) {
-			return
+			return true
 		}
 
 		this.position = options[0]
+		return false
 	}
 
 	private canMove(position: Point): boolean {

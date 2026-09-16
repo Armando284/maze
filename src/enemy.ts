@@ -36,7 +36,7 @@ export class Enemy {
 		this.position = { ...startPosition }
 	}
 
-	update(deltaTime: number): void {
+	update(deltaTime: number): boolean {
 		this.moveTimer += deltaTime
 
 		const interval =
@@ -45,14 +45,13 @@ export class Enemy {
 				: this.moveInterval
 
 		if (this.moveTimer < interval) {
-			return
+			return false
 		}
 
 		this.moveTimer = 0
 
 		if (this.scared || this.behavior === 'patrol') {
-			this.wander()
-			return
+			return !this.wander()
 		}
 
 		const path = this.pathfinder.findPath(
@@ -61,10 +60,11 @@ export class Enemy {
 		)
 
 		if (path.length < 2) {
-			return
+			return true
 		}
 
 		this.moveTo(path[1])
+		return false
 	}
 
 	isTouchingPlayer(): boolean {
@@ -74,7 +74,7 @@ export class Enemy {
 		)
 	}
 
-	private wander(): void {
+	private wander(): boolean {
 		const options = shuffle(DIRECTIONS)
 			.map((direction) => ({
 				x: this.position.x + direction.x,
@@ -83,10 +83,11 @@ export class Enemy {
 			.filter((position) => this.maze.isWalkable(position))
 
 		if (options.length === 0) {
-			return
+			return false
 		}
 
 		this.moveTo(options[0])
+		return true
 	}
 
 	private moveTo(position: Point): void {

@@ -194,6 +194,11 @@ bit(combo: number): void {
 		this.tone(440, 0.18, 0.14)
 	}
 
+	bump(): void {
+		this.tone(170, 0.06)
+		this.tone(130, 0.07, 0.05)
+	}
+
 	freeze(): void {
 		this.tone(660, 0.1)
 		this.tone(440, 0.1, 0.1)

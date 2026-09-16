@@ -9,7 +9,7 @@ se vuelve **ANTIVIRUS** con las píldoras `+`, y el **EXIT** (`E`) está siempre
 abierto para saltar a la siguiente ronda de dificultad creciente.
 Estética de terminal fósforo verde + overlay CRT + fuente monospace.
 
-## Estado actual — Fases 1 a 19 completadas
+## Estado actual — Fases 1 a 20 completadas
 
 | Fase | Scope | Estado |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ Estética de terminal fósforo verde + overlay CRT + fuente monospace.
 | **17** | **Visualizador de música en el navbar**: `AnalyserNode` sobre el master de audio, forma de onda en canvas (scope) con línea + relleno en colores cíclicos según la energía, atenuado cuando está silenciado o sin señal | ✅ |
 | **18** | **Un solo puntaje**: los bits `·` se mantienen en el laberinto pero **van directo al SCORE** (`+10 × combo`, max ×5), sin métrica de bits separada (fuera contador BITS y `dotsRemaining`); el **EXIT está siempre abierto** (victoria solo al pisarlo); HUD de **una sola línea** (SESSION PLAYER SCORE COMBO LIVES FRIGHT MUTE STATUS + visualizador, sin BITS/HI-SCORE/PAD); texto de HELP/título/boot adaptado | ✅ |
 | **19** | **Navbar de una sola línea + osciloscopio vivo**: HUD comprimido (fuente 12px, `letter-spacing` 1px, gaps 8×10, min-widths reducidos, textos de estado cortos) para que todos los datos + visualizador quepan sin saltar de línea; la gráfica pasa a ser un **scope con forma de onda** (AUC por intensidad: las subidas/bajadas muestran la forma del audio según lo fuerte que suene) con **seno de respiro** animado cuando no hay música y atenuado si está en mute | ✅ |
+| **20** | **Bounce-back contra obstáculos**: al intentar caminar hacia una pared (jugador o enemigos/ghost atrapados) se genera un **rebote**: sacudida sutil, ráfaga de partículas en dirección contraria y un **thud** grave y corto; con throttle (~170ms) para que sostener la tecla no spammee | ✅ |
 
 ## Decisiones técnicas y convenciones
 

@@ -99,6 +99,7 @@ export class Game {
 	private lastTime = 0
 	private animationFrame = 0
 	private playerMoveTimer = 0
+	private nextBounceAt = 0
 	private started = false
 	private readonly heldKeys = new Set<string>()
 	private readonly pressOrder: string[] = []
@@ -469,10 +470,18 @@ export class Game {
 
 		if (!frozen) {
 			for (const enemy of this.enemies) {
-				enemy.update(deltaTime)
+				const bumped = enemy.update(deltaTime)
+
+				if (bumped) {
+					this.bounce(enemy.position, { x: 0, y: 0 }, '#ff6666')
+				}
 			}
 
-			this.ghost.update(deltaTime)
+			const ghostBumped = this.ghost.update(deltaTime)
+
+			if (ghostBumped) {
+				this.bounce(this.ghost.position, { x: 0, y: 0 }, '#ccff99')
+			}
 		}
 
 		if (this.checkVictory()) {
@@ -1303,6 +1312,7 @@ export class Game {
 		}
 
 		if (!this.player.move(direction)) {
+			this.bounce(this.player.position, direction, '#66ff99')
 			return
 		}
 
@@ -1311,6 +1321,41 @@ export class Game {
 		this.collectFreezeAt(this.player.position)
 		this.collectExtraAt(this.player.position)
 		this.applyTeleport()
+	}
+
+	private bounce(point: Point, direction: Point, color: string): void {
+		const now = performance.now()
+
+		if (now < this.nextBounceAt) {
+			return
+		}
+
+		this.nextBounceAt = now + 170
+
+		this.state.shake = Math.max(this.state.shake, 1.2)
+		this.audio.bump()
+
+		const count = 5
+
+		for (let index = 0; index < count; index++) {
+			if (this.state.particles.length >= MAX_PARTICLES) {
+				break
+			}
+
+			const spread = Math.random() * Math.PI * 2
+			const push = Math.random() * 1.8
+
+			this.state.particles.push({
+				x: point.x,
+				y: point.y,
+				vx: -direction.x * push + Math.cos(spread) * 0.4,
+				vy: -direction.y * push + Math.sin(spread) * 0.4,
+				life: 0.22 + Math.random() * 0.2,
+				maxLife: 0.5,
+				color,
+				size: 1.4 + Math.random() * 0.7,
+			})
+		}
 	}
 
 	private collectBit(point: Point): void {
