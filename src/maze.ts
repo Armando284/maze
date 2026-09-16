@@ -22,12 +22,10 @@ export const MAZE_HEIGHT = 19
 export class Maze {
 	private readonly cells: Cell[][]
 	private readonly loopDensity = 0.3
-	private dotCount = 0
 	readonly teleports: TeleportPair[] = []
 
 	constructor() {
 		this.cells = this.generate()
-		this.dotCount = this.countDots()
 	}
 
 	getCell(point: Point): Cell {
@@ -132,7 +130,7 @@ export class Maze {
 			return
 		}
 
-const second = shuffle(candidates).find(
+		const second = shuffle(candidates).find(
 			(point) =>
 				(point.x !== first.x || point.y !== first.y) &&
 				manhattanDistance(point, first) >= 12,
@@ -183,20 +181,6 @@ const second = shuffle(candidates).find(
 		}
 	}
 
-	private countDots(): number {
-		let count = 0
-
-		for (const row of this.cells) {
-			for (const cell of row) {
-				if (cell === 'dot') {
-					count++
-				}
-			}
-		}
-
-		return count
-	}
-
 	private fillDots(cells: Cell[][]): void {
 		for (let y = 0; y < MAZE_HEIGHT; y++) {
 			for (let x = 0; x < MAZE_WIDTH; x++) {
@@ -213,7 +197,6 @@ const second = shuffle(candidates).find(
 		}
 
 		this.cells[point.y][point.x] = 'floor'
-		this.dotCount--
 
 		return true
 	}
@@ -260,10 +243,6 @@ const second = shuffle(candidates).find(
 		}
 
 		return null
-	}
-
-	get dotsRemaining(): number {
-		return this.dotCount
 	}
 
 	findNearestCollectable(from: Point): Point | null {

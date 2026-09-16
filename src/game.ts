@@ -2,8 +2,10 @@ import { Player } from './player'
 import { ALL_ACHIEVEMENTS } from './achievements'
 import { Renderer } from './renderer'
 import {
+	BINDABLE_ACTIONS,
 	type Difficulty,
 	type GameState,
+	type KeyAction,
 	type PlayStats,
 	type ScoreEntry,
 } from './game-state'
@@ -48,8 +50,11 @@ const MUTED_KEY = 'maze-muted'
 const DIFFICULTY_KEY = 'maze-difficulty'
 const STATS_KEY = 'maze-stats'
 const ACHIEVEMENTS_KEY = 'maze-achievements'
+const KEYS_KEY = 'maze-keys'
+const ZOOM_KEY = 'maze-zoom'
+const PLAYERS_KEY = 'maze-players'
 const INITIALS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-const PAUSE_KEYS = new Set(['p', 'P', 'Escape'])
+const ZOOM_OPTIONS = [1, 1.25, 1.5]
 
 const EMPTY_STATS: PlayStats = {
 	bits: 0,
@@ -97,15 +102,20 @@ export class Game {
 	private started = false
 	private readonly heldKeys = new Set<string>()
 	private readonly pressOrder: string[] = []
+	private touchX = 0
+	private touchY = 0
+	private touchActive = false
 	private readonly audio = new Audio()
 	private readonly hud = new Hud()
 	private readonly gamepad: GamepadInput
 	private readonly state: GameState = {
 		status: 'title',
+		playerCount: 1,
+		currentPlayer: 1,
+		playerScores: [0, 0],
 		score: 0,
 		hiScore: 0,
 		session: 1,
-		dots: 0,
 		fright: 0,
 		freeze: 0,
 		lives: MAX_LIVES,
@@ -118,9 +128,16 @@ export class Game {
 		unlocked: [],
 		lostLifeThisSession: false,
 		achieveToast: null,
+		bindings: {},
+		keysIndex: 0,
+		keysAwaiting: false,
+		zoomIndex: 0,
 		introTimer: 0,
 		deathTimer: 0,
 		shake: 0,
+		combo: 0,
+		comboTimer: 0,
+		scoreDisplay: 0,
 		demo: false,
 		demoTimer: 0,
 		popups: [],
@@ -131,8 +148,6 @@ export class Game {
 		hsEntry: false,
 	}
 	private readonly enemyMinDistance = 12
-	private combo = 0
-	private comboTimer = 0
 	private get ghostMinDistance(): number {
 		return Math.max(6, 18 - (this.state.session - 1) * 2)
 	}
@@ -151,6 +166,11 @@ export class Game {
 	private ghost!: Ghost
 	private renderer!: Renderer
 	private botPathfinder: Pathfinder | null = null
+	private readonly movementKeys = new Map<string, Point>()
+	private readonly actionKeys = new Set<string>()
+	private readonly pauseKeys = new Set<string>()
+	private readonly helpKeys = new Set<string>()
+	private readonly muteKeys = new Set<string>()
 
 	constructor(context: CanvasRenderingContext2D) {
 		this.context = context
@@ -160,6 +180,11 @@ export class Game {
 		this.state.hiScore = this.loadHiScore()
 		this.state.stats = this.loadStats()
 		this.state.unlocked = this.loadUnlocked()
+		this.state.bindings = this.loadBindings()
+		this.state.zoomIndex = this.loadZoom()
+		this.state.playerCount = this.loadPlayerCount()
+		this.rebuildInputs()
+		this.applyZoom()
 		this.createGame()
 		this.createRenderer()
 		this.state.status = 'title'
@@ -175,6 +200,68 @@ export class Game {
 			(key) => this.simulateKey('keydown', key),
 			(key) => this.simulateKey('keyup', key),
 		)
+
+		const canvas = this.context.canvas
+		canvas.addEventListener(
+			'touchstart',
+			(event) => this.handleTouchStart(event),
+			{ passive: true },
+		)
+		canvas.addEventListener(
+			'touchend',
+			(event) => this.handleTouchEnd(event),
+			{ passive: true },
+		)
+	}
+
+	private handleTouchStart(event: TouchEvent): void {
+		if (this.state.status !== 'playing') {
+			return
+		}
+
+		const touch = event.touches[0]
+
+		if (!touch) {
+			return
+		}
+
+		this.touchX = touch.clientX
+		this.touchY = touch.clientY
+		this.touchActive = true
+	}
+
+	private handleTouchEnd(event: TouchEvent): void {
+		if (!this.touchActive) {
+			return
+		}
+
+		this.touchActive = false
+		const touch = event.changedTouches[0]
+
+		if (!touch) {
+			return
+		}
+
+		const dx = touch.clientX - this.touchX
+		const dy = touch.clientY - this.touchY
+		const absX = Math.abs(dx)
+		const absY = Math.abs(dy)
+
+		if (Math.max(absX, absY) < 30) {
+			return
+		}
+
+		const key =
+			absX > absY
+				? dx > 0
+					? 'ArrowRight'
+					: 'ArrowLeft'
+				: dy > 0
+					? 'ArrowDown'
+					: 'ArrowUp'
+
+		this.simulateKey('keydown', key)
+		window.setTimeout(() => this.simulateKey('keyup', key), 60)
 	}
 
 	private simulateKey(type: 'keydown' | 'keyup', key: string): void {
@@ -183,6 +270,14 @@ export class Game {
 
 	unlockAudio(): void {
 		this.audio.unlock()
+	}
+
+	getAudio(): Audio {
+		return this.audio
+	}
+
+	playBootJingle(): void {
+		this.audio.bootJingle()
 	}
 
 	private createGame(): void {
@@ -204,7 +299,6 @@ export class Game {
 
 		this.state.status = 'playing'
 		this.state.lives = this.maxLives
-		this.state.dots = this.maze.dotsRemaining
 		this.state.lostLifeThisSession = false
 		this.state.achieveToast = null
 		this.state.fright = 0
@@ -216,8 +310,9 @@ export class Game {
 		this.state.hsEntry = false
 		this.state.popups.length = 0
 		this.state.particles.length = 0
-		this.combo = 0
-		this.comboTimer = 0
+		this.state.combo = 0
+		this.state.comboTimer = 0
+		this.state.scoreDisplay = 0
 	}
 
 	private spawnEnemies(): void {
@@ -316,6 +411,18 @@ export class Game {
 					}
 				}
 			}
+
+			if (
+				this.state.status === 'gameover' ||
+				this.state.status === 'won'
+			) {
+				const step = deltaTime / 1000
+				this.state.scoreDisplay = Math.min(
+					this.state.score,
+					this.state.scoreDisplay + (this.state.score * 0.6 + 40) * step,
+				)
+			}
+
 			this.updateHiScore()
 			return
 		}
@@ -333,8 +440,9 @@ export class Game {
 			this.state.deathTimer -= deltaTime / 1000
 			this.state.flash = Math.max(0, this.state.flash - deltaTime / 1000)
 			this.state.shake = Math.max(0, this.state.shake - deltaTime / 50)
-			this.agePopups(deltaTime)
-			this.ageParticles(deltaTime)
+			const slowStep = deltaTime * 0.35
+			this.agePopups(slowStep)
+			this.ageParticles(slowStep)
 			this.spawnDeathEmbers()
 
 			if (this.state.deathTimer <= 0) {
@@ -348,6 +456,9 @@ export class Game {
 		if (this.state.demo) {
 			this.botTick()
 		}
+		this.audio.setTempo(
+			this.state.fright > 0 || this.state.freeze > 0 ? 0.72 : 1,
+		)
 		this.updatePlayer(deltaTime)
 		this.updateFrightState(deltaTime)
 		this.updateTimers(deltaTime)
@@ -522,10 +633,10 @@ export class Game {
 		this.state.shake = Math.max(0, this.state.shake - deltaTime / 50)
 		this.state.freeze = Math.max(0, this.state.freeze - deltaTime / 1000)
 
-		this.comboTimer = Math.max(0, this.comboTimer - deltaTime)
+		this.state.comboTimer = Math.max(0, this.state.comboTimer - deltaTime)
 
-		if (this.comboTimer === 0) {
-			this.combo = 0
+		if (this.state.comboTimer === 0) {
+			this.state.combo = 0
 		}
 
 		if (this.state.achieveToast) {
@@ -582,7 +693,7 @@ export class Game {
 			return null
 		}
 
-		return DIRECTION_BY_KEY[key] ?? null
+		return this.movementKeys.get(key) ?? null
 	}
 
 	private handleKeyDown(event: KeyboardEvent): void {
@@ -592,7 +703,12 @@ export class Game {
 			return
 		}
 
-		if (event.key === 'm' || event.key === 'M') {
+		if (this.state.status === 'keys' && this.state.keysAwaiting) {
+			this.handleKeysKey(event)
+			return
+		}
+
+		if (this.muteKeys.has(event.key)) {
 			this.toggleMute()
 			return
 		}
@@ -600,8 +716,8 @@ export class Game {
 		if (this.state.demo) {
 			this.endDemo()
 
-			if (isActionKey(event.key)) {
-				this.newGame()
+			if (this.isAction(event.key)) {
+				this.startRun()
 			}
 			return
 		}
@@ -610,17 +726,22 @@ export class Game {
 			case 'title':
 				this.state.demoTimer = 0
 
-				if (isHelpKey(event.key)) {
+				if (event.key === '1' || event.key === '2') {
+					this.setPlayerCount(event.key === '2' ? 2 : 1)
+					return
+				}
+
+				if (this.isHelp(event.key)) {
 					this.state.status = 'help'
 					return
 				}
 
-				if (isActionKey(event.key)) {
-					this.newGame()
+				if (this.isAction(event.key)) {
+					this.startRun()
 					return
 				}
 
-				const titleStep = difficultyStep(event.key)
+				const titleStep = this.difficultyStep(event.key)
 
 				if (titleStep !== 0) {
 					this.cycleDifficulty(titleStep)
@@ -628,17 +749,17 @@ export class Game {
 				return
 
 			case 'help':
-				if (isHelpKey(event.key)) {
+				if (this.isHelp(event.key)) {
 					this.state.status = 'achievements'
 					return
 				}
 
-				if (isActionKey(event.key) || PAUSE_KEYS.has(event.key)) {
+				if (this.isAction(event.key) || this.pauseKeys.has(event.key)) {
 					this.state.status = 'title'
 					return
 				}
 
-				const helpStep = difficultyStep(event.key)
+				const helpStep = this.difficultyStep(event.key)
 
 				if (helpStep !== 0) {
 					this.cycleDifficulty(helpStep)
@@ -646,13 +767,18 @@ export class Game {
 				return
 
 			case 'achievements':
-				if (
-					isHelpKey(event.key) ||
-					isActionKey(event.key) ||
-					PAUSE_KEYS.has(event.key)
-				) {
+				if (this.isHelp(event.key)) {
+					this.state.status = 'keys'
+					return
+				}
+
+				if (this.isAction(event.key) || this.pauseKeys.has(event.key)) {
 					this.state.status = 'title'
 				}
+				return
+
+			case 'keys':
+				this.handleKeysKey(event)
 				return
 
 			case 'gameover':
@@ -660,13 +786,13 @@ export class Game {
 				return
 
 			case 'won':
-				if (isActionKey(event.key)) {
+				if (this.isAction(event.key)) {
 					this.nextSession()
 				}
 				return
 
 			case 'playing':
-				if (PAUSE_KEYS.has(event.key)) {
+				if (this.pauseKeys.has(event.key)) {
 					this.setPaused(true)
 					return
 				}
@@ -674,10 +800,249 @@ export class Game {
 				return
 
 			case 'paused':
-				if (PAUSE_KEYS.has(event.key)) {
+				if (event.key === 'r' || event.key === 'R') {
+					this.newGame()
+					return
+				}
+
+				if (event.key === 'q' || event.key === 'Q') {
+					this.audio.stopMusic()
+					this.state.status = 'title'
+					return
+				}
+
+				if (this.pauseKeys.has(event.key)) {
 					this.setPaused(false)
 				}
 				return
+		}
+	}
+
+	private isAction(key: string): boolean {
+		return this.actionKeys.has(key)
+	}
+
+	private isHelp(key: string): boolean {
+		return this.helpKeys.has(key)
+	}
+
+	private difficultyStep(key: string): number {
+		const direction = this.movementKeys.get(key)
+
+		if (!direction) {
+			return 0
+		}
+
+		if (direction.x === -1) {
+			return -1
+		}
+
+		if (direction.x === 1) {
+			return 1
+		}
+
+		return 0
+	}
+
+	private rebuildInputs(): void {
+		this.movementKeys.clear()
+		this.actionKeys.clear()
+		this.pauseKeys.clear()
+		this.helpKeys.clear()
+		this.muteKeys.clear()
+
+		for (const [key, point] of Object.entries(DIRECTION_BY_KEY)) {
+			this.movementKeys.set(key, point)
+		}
+
+		this.actionKeys.add('Enter').add(' ')
+		this.pauseKeys.add('p').add('P').add('Escape')
+		this.helpKeys.add('?').add('h').add('H')
+		this.muteKeys.add('m').add('M')
+
+		const bindings = this.state.bindings
+
+		if (bindings.up) {
+			this.movementKeys.set(bindings.up, { x: 0, y: -1 })
+		}
+
+		if (bindings.down) {
+			this.movementKeys.set(bindings.down, { x: 0, y: 1 })
+		}
+
+		if (bindings.left) {
+			this.movementKeys.set(bindings.left, { x: -1, y: 0 })
+		}
+
+		if (bindings.right) {
+			this.movementKeys.set(bindings.right, { x: 1, y: 0 })
+		}
+
+		if (bindings.action) {
+			this.actionKeys.add(bindings.action)
+		}
+
+		if (bindings.pause) {
+			this.pauseKeys.add(bindings.pause)
+		}
+
+		if (bindings.help) {
+			this.helpKeys.add(bindings.help)
+		}
+
+		if (bindings.mute) {
+			this.muteKeys.add(bindings.mute)
+		}
+	}
+
+	private setKeyBinding(action: KeyAction, key: string): void {
+		this.state.bindings = { ...this.state.bindings, [action]: key }
+		this.rebuildInputs()
+		this.saveBindings()
+	}
+
+	private handleKeysKey(event: KeyboardEvent): void {
+		if (this.state.keysAwaiting) {
+			if (event.key === 'Escape') {
+				this.state.keysAwaiting = false
+				return
+			}
+
+			const action = BINDABLE_ACTIONS[this.state.keysIndex]
+
+			if (action) {
+				this.setKeyBinding(action, event.key)
+			}
+
+			this.state.keysAwaiting = false
+			return
+		}
+
+		const direction = this.movementKeys.get(event.key)
+
+		if (direction) {
+			if (direction.y === -1) {
+				this.state.keysIndex = Math.max(0, this.state.keysIndex - 1)
+			} else if (direction.y === 1) {
+				this.state.keysIndex = Math.min(
+					BINDABLE_ACTIONS.length - 1,
+					this.state.keysIndex + 1,
+				)
+			} else if (direction.x === -1) {
+				this.adjustZoom(-1)
+			} else if (direction.x === 1) {
+				this.adjustZoom(1)
+			}
+			return
+		}
+
+		if (this.isAction(event.key)) {
+			this.state.keysAwaiting = true
+			return
+		}
+
+		if (this.isHelp(event.key) || this.pauseKeys.has(event.key)) {
+			this.state.status = 'title'
+		}
+	}
+
+	private adjustZoom(step: number): void {
+		this.state.zoomIndex = Math.min(
+			ZOOM_OPTIONS.length - 1,
+			Math.max(0, this.state.zoomIndex + step),
+		)
+		this.applyZoom()
+		this.saveZoom()
+	}
+
+	private applyZoom(): void {
+		const value = ZOOM_OPTIONS[this.state.zoomIndex] ?? 1
+		const style = document.body.style as CSSStyleDeclaration & {
+			zoom?: string
+		}
+
+		if (value === 1) {
+			delete style.zoom
+		} else {
+			style.zoom = String(value)
+		}
+	}
+
+	private loadBindings(): Partial<Record<KeyAction, string>> {
+		try {
+			const raw = localStorage.getItem(KEYS_KEY)
+
+			if (!raw) {
+				return {}
+			}
+
+			const parsed = JSON.parse(raw) as Record<string, unknown>
+			const bindings: Partial<Record<KeyAction, string>> = {}
+
+			for (const action of BINDABLE_ACTIONS) {
+				const value = parsed[action]
+
+				if (typeof value === 'string' && value.length > 0) {
+					bindings[action] = value
+				}
+			}
+
+			return bindings
+		} catch {
+			return {}
+		}
+	}
+
+	private saveBindings(): void {
+		try {
+			localStorage.setItem(KEYS_KEY, JSON.stringify(this.state.bindings))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadZoom(): number {
+		try {
+			const raw = localStorage.getItem(ZOOM_KEY)
+			const index = raw === null ? 0 : Number.parseInt(raw, 10)
+
+			if (
+				Number.isFinite(index) &&
+				index >= 0 &&
+				index < ZOOM_OPTIONS.length
+			) {
+				return index
+			}
+
+			return 0
+		} catch {
+			return 0
+		}
+	}
+
+	private saveZoom(): void {
+		try {
+			localStorage.setItem(ZOOM_KEY, String(this.state.zoomIndex))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private setPlayerCount(count: 1 | 2): void {
+		this.state.playerCount = count
+
+		try {
+			localStorage.setItem(PLAYERS_KEY, String(count))
+		} catch {
+			// storage unavailable, ignore
+		}
+	}
+
+	private loadPlayerCount(): 1 | 2 {
+		try {
+			return localStorage.getItem(PLAYERS_KEY) === '2' ? 2 : 1
+		} catch {
+			return 1
 		}
 	}
 
@@ -842,7 +1207,7 @@ export class Game {
 	}
 
 	private handlePlayingKey(event: KeyboardEvent): void {
-		if (!DIRECTION_BY_KEY[event.key]) {
+		if (!this.movementKeys.has(event.key)) {
 			return
 		}
 
@@ -856,8 +1221,8 @@ export class Game {
 
 	private handleGameOverKey(event: KeyboardEvent): void {
 		if (!this.state.hsEntry) {
-			if (isActionKey(event.key)) {
-				this.state.status = 'title'
+			if (this.isAction(event.key)) {
+				this.advanceFromGameOver()
 			}
 			return
 		}
@@ -865,37 +1230,35 @@ export class Game {
 		this.handleInitialsKey(event)
 	}
 
+	private advanceFromGameOver(): void {
+		if (this.state.playerCount === 2 && this.state.currentPlayer === 1) {
+			this.state.playerScores[0] = this.state.score
+			this.state.currentPlayer = 2
+			this.newGame()
+			return
+		}
+
+		this.state.status = 'title'
+	}
+
 	private handleInitialsKey(event: KeyboardEvent): void {
-		const key = event.key
+		const direction = this.movementKeys.get(event.key)
 
-		switch (key) {
-			case 'ArrowUp':
-			case 'w':
-			case 'W':
+		if (direction) {
+			if (direction.y === -1) {
 				this.cycleInitial(-1)
-				break
-
-			case 'ArrowDown':
-			case 's':
-			case 'S':
+			} else if (direction.y === 1) {
 				this.cycleInitial(1)
-				break
-
-			case 'ArrowLeft':
-			case 'a':
-			case 'A':
+			} else if (direction.x === -1) {
 				this.state.hsIndex = Math.max(0, this.state.hsIndex - 1)
-				break
-
-			case 'ArrowRight':
-			case 'd':
-			case 'D':
+			} else if (direction.x === 1) {
 				this.state.hsIndex = Math.min(2, this.state.hsIndex + 1)
-				break
+			}
+			return
+		}
 
-			case 'Enter':
-				this.submitScore()
-				break
+		if (this.isAction(event.key)) {
+			this.submitScore()
 		}
 	}
 
@@ -955,34 +1318,40 @@ export class Game {
 			return
 		}
 
-		this.state.dots = this.maze.dotsRemaining
 		this.renderer.clearCell(point)
 
-		if (this.comboTimer > 0) {
-			this.combo = Math.min(COMBO_MAX, this.combo + 1)
+		if (this.state.comboTimer > 0) {
+			this.state.combo = Math.min(COMBO_MAX, this.state.combo + 1)
 		} else {
-			this.combo = 1
+			this.state.combo = 1
 		}
 
-		this.comboTimer = COMBO_WINDOW
+		this.state.comboTimer = COMBO_WINDOW
 
-		this.state.score += POINTS_PER_BIT * this.combo
-		this.audio.coin()
+		const gained = POINTS_PER_BIT * this.state.combo
+
+		this.state.score += gained
+		this.audio.bit(this.state.combo)
 
 		if (!this.state.demo) {
 			const stats = this.state.stats
 			stats.bits += 1
 
-			if (this.combo > stats.maxCombo) {
-				stats.maxCombo = this.combo
+			if (this.state.combo > stats.maxCombo) {
+				stats.maxCombo = this.state.combo
 			}
 
 			this.saveStats()
 			this.checkAchievements()
 		}
 
-		if (this.combo >= 3) {
-			this.addPopup(`x${this.combo}`, point.x, point.y - 1, '#ffaa33')
+		if (this.state.combo === 3 || this.state.combo === COMBO_MAX) {
+			this.addPopup(
+				`x${this.state.combo} +${gained}`,
+				point.x,
+				point.y - 1,
+				'#ffaa33',
+			)
 		}
 	}
 
@@ -1060,9 +1429,7 @@ export class Game {
 	}
 
 	private checkVictory(): boolean {
-		const allBitsCollected = this.state.dots === 0
-
-		if (this.player.isAtExit() || allBitsCollected) {
+		if (this.player.isAtExit()) {
 			this.state.status = 'won'
 
 			if (this.state.demo) {
@@ -1122,6 +1489,7 @@ export class Game {
 		this.state.flash = FLASH_DURATION
 		this.state.shake = SHAKE_MAX
 		this.audio.death()
+		this.buzz(120)
 		this.spawnBurst(
 			this.player.position.x,
 			this.player.position.y,
@@ -1140,6 +1508,47 @@ export class Game {
 		this.state.invincible = INVINCIBLE_DURATION
 	}
 
+	private buzz(duration: number): void {
+		try {
+			;(navigator as { vibrate?: (ms: number) => boolean }).vibrate?.(
+				duration,
+			)
+		} catch {
+			// vibration unavailable, ignore
+		}
+
+		try {
+			const pads = navigator.getGamepads ? navigator.getGamepads() : []
+
+			for (let i = 0; i < (pads?.length ?? 0); i++) {
+				const actuator = (
+					pads[i] as {
+						vibrationActuator?: {
+							playEffect(
+								type: string,
+								params: {
+									duration: number
+									strongMagnitude: number
+									weakMagnitude: number
+								},
+							): Promise<unknown>
+						}
+					}
+				).vibrationActuator
+
+				if (actuator) {
+					actuator.playEffect('dual-rumble', {
+						duration,
+						strongMagnitude: 0.8,
+						weakMagnitude: 0.4,
+					})
+				}
+			}
+		} catch {
+			// haptics unavailable, ignore
+		}
+	}
+
 	private gameOver(): void {
 		this.state.status = 'gameover'
 
@@ -1152,13 +1561,39 @@ export class Game {
 		this.audio.stopMusic()
 		this.audio.death()
 
-		if (this.qualifiesForScores(this.state.score)) {
+		const lastPlayer =
+			this.state.playerCount < 2 || this.state.currentPlayer === 2
+
+		if (lastPlayer && this.qualifiesForScores(this.state.score)) {
 			this.state.hsEntry = true
 			this.state.hsName = 'AAA'
 			this.state.hsIndex = 0
+		} else if (this.state.playerCount === 2) {
+			this.enterPlayerOneScore()
 		}
 
 		this.updateHiScore()
+	}
+
+	private enterPlayerOneScore(): void {
+		if (!this.qualifiesForScores(this.state.score)) {
+			return
+		}
+
+		const entry: ScoreEntry = {
+			name: 'P1',
+			score: this.state.score,
+		}
+
+		this.state.scores = [...this.state.scores, entry]
+			.sort((a, b) => b.score - a.score)
+			.slice(0, MAX_SCORES)
+
+		try {
+			localStorage.setItem(SCORES_KEY, JSON.stringify(this.state.scores))
+		} catch {
+			// storage unavailable, ignore
+		}
 	}
 
 	private slayScaredDaemons(): void {
@@ -1246,6 +1681,12 @@ export class Game {
 		this.createRenderer()
 		this.state.introTimer = INTRO_DURATION
 		this.audio.startMusic()
+	}
+
+	private startRun(): void {
+		this.state.currentPlayer = 1
+		this.state.playerScores = [0, 0]
+		this.newGame()
 	}
 
 	private nextSession(): void {
@@ -1435,26 +1876,6 @@ export class Game {
 	private isSameCell(pointA: Point, pointB: Point): boolean {
 		return pointA.x === pointB.x && pointA.y === pointB.y
 	}
-}
-
-function isActionKey(key: string): boolean {
-	return key === 'Enter' || key === ' '
-}
-
-function isHelpKey(key: string): boolean {
-	return key === '?' || key === 'h' || key === 'H'
-}
-
-function difficultyStep(key: string): number {
-	if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
-		return -1
-	}
-
-	if (key === 'ArrowRight' || key === 'd' || key === 'D') {
-		return 1
-	}
-
-	return 0
 }
 
 function directionKey(direction: Point): string | null {

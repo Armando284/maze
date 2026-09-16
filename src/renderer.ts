@@ -1,4 +1,8 @@
-import type { GameState } from './game-state'
+import {
+	BINDABLE_ACTIONS,
+	type GameState,
+	type KeyAction,
+} from './game-state'
 import { ALL_ACHIEVEMENTS } from './achievements'
 import { CELL_SIZE, toPixel, type Point } from './grid'
 import { MAZE_WIDTH, MAZE_HEIGHT, Maze } from './maze'
@@ -9,12 +13,12 @@ import { CANVAS_HEIGHT, CANVAS_WIDTH } from './main'
 
 const SYMBOLS = {
 	wall: '#',
-	exit: 'E',
 	dot: '·',
-	pill: '+',
 	freeze: '*',
-	extra: '1',
 	teleport: 'T',
+	exit: 'E',
+	pill: '+',
+	extra: '1',
 	player: '@',
 	daemon: '&',
 	glitch: '?',
@@ -22,6 +26,40 @@ const SYMBOLS = {
 
 const POPUP_LIFE = 0.9
 const DEMO_DELAY = 12
+
+const KEY_ACTION_LABELS: Record<KeyAction, string> = {
+	up: 'UP',
+	down: 'DOWN',
+	left: 'LEFT',
+	right: 'RIGHT',
+	action: 'CONFIRM',
+	pause: 'PAUSE',
+	help: 'HELP',
+	mute: 'MUTE',
+}
+
+const KEY_DEFAULT_LABELS: Record<KeyAction, string> = {
+	up: '\u2191/W',
+	down: '\u2193/S',
+	left: '\u2190/A',
+	right: '\u2192/D',
+	action: 'ENTER',
+	pause: 'P',
+	help: '?/H',
+	mute: 'M',
+}
+
+function keyName(key: string): string {
+	if (key === ' ') {
+		return 'SPACE'
+	}
+
+	if (key === 'Escape') {
+		return 'ESC'
+	}
+
+	return key.length === 1 ? key.toUpperCase() : key
+}
 
 export class Renderer {
 	private readonly context: CanvasRenderingContext2D
@@ -126,6 +164,10 @@ export class Renderer {
 				this.renderAchievements()
 				return
 
+			case 'keys':
+				this.renderKeys()
+				return
+
 			case 'paused':
 				this.renderGame()
 				this.renderPauseOverlay()
@@ -162,6 +204,23 @@ export class Renderer {
 		this.context.fillStyle = blink ? '#ffcc33' : '#5a3a00'
 		this.context.font = '10px monospace'
 		this.context.fillText('DEMO MODE // PRESS ANY KEY', 14, CANVAS_HEIGHT - 16)
+	}
+
+	private drawMenuRain(): void {
+		const now = Date.now()
+
+		this.context.fillStyle = 'rgba(48, 120, 70, 0.25)'
+		this.context.font = '14px monospace'
+
+		for (let i = 0; i < 60; i++) {
+			const x = (i * 83 + 9) % CANVAS_WIDTH
+			const speed = 16 + ((i * 37) % 30)
+			const y = ((now * 0.01 + i * 131) % (CANVAS_HEIGHT + 40)) - 20
+			const glyph =
+				'0123456789ABCDEF'[(i * 5 + Math.floor(now / 400)) % 16]
+
+			this.context.fillText(glyph, x, y)
+		}
 	}
 
 	private renderGame(): void {
@@ -298,7 +357,7 @@ export class Renderer {
 		this.context.fillStyle = '#fff'
 		this.context.font = '10px monospace'
 		this.context.fillText(
-			'P RESUME // M MUTE // PAD B RESUME',
+			'P/R/Q RESUME RESTART QUIT // B RESUME',
 			CANVAS_WIDTH / 2,
 			132,
 		)
@@ -308,6 +367,10 @@ export class Renderer {
 
 	private renderIntro(): void {
 		const ready = Math.floor(Date.now() / 400) % 2 === 0
+		const playerPrefix =
+			this.state.playerCount === 2
+				? `PLAYER ${this.state.currentPlayer} // `
+				: ''
 
 		this.context.textAlign = 'center'
 		this.context.textBaseline = 'top'
@@ -315,7 +378,7 @@ export class Renderer {
 		this.context.fillStyle = '#33ff66'
 		this.context.font = '20px monospace'
 		this.context.fillText(
-			`SESSION ${pad2(this.state.session)}`,
+			`${playerPrefix}SESSION ${pad2(this.state.session)}`,
 			CANVAS_WIDTH / 2,
 			96,
 		)
@@ -323,6 +386,14 @@ export class Renderer {
 		this.context.fillStyle = ready ? '#fff' : '#5a7a5a'
 		this.context.font = '12px monospace'
 		this.context.fillText('READY?', CANVAS_WIDTH / 2, 124)
+
+		if (this.state.session >= 3) {
+			const warn = Math.floor(Date.now() / 300) % 2 === 0
+
+			this.context.fillStyle = warn ? '#ff8833' : '#5a3a00'
+			this.context.font = '12px monospace'
+			this.context.fillText('HUNTER INBOUND', CANVAS_WIDTH / 2, 148)
+		}
 
 		this.context.textAlign = 'left'
 	}
@@ -425,6 +496,7 @@ export class Renderer {
 
 		this.context.textAlign = 'left'
 		this.context.textBaseline = 'top'
+		this.drawMenuRain()
 
 		this.context.fillStyle = '#33ff66'
 		this.context.font = '22px monospace'
@@ -432,13 +504,13 @@ export class Renderer {
 
 		const lines: string[] = [
 			'MOVE .... ARROWS / WASD / D-PAD / STICK',
-			'BITS · .. +10 EA, COMBO UP TO x5',
+			'BITS · .. +10 EA INTO SCORE, COMBO UP TO x5',
 			'+ ........ ANTIVIRUS, EAT SCARED DAEMONS',
 			'* ........ FREEZE DAEMONS 5S (LETHAL)',
 			'1 ........ RARE +1 LIFE',
 			'T ........ TELEPORT BETWEEN THE TWO TILES',
 			'& / ? .... DAEMON / GLITCH, -1 LIFE TOUCH',
-			'E ........ EXIT OR EMPTY THE VAULT +1000',
+			'E ........ REACH THE EXIT +1000, NEXT VAULT',
 			'SESSION .. NEXT ROUND: FASTER, MORE DAEMONS',
 		]
 
@@ -466,7 +538,7 @@ export class Renderer {
 
 		this.context.fillStyle = returnHint ? '#33ff66' : '#0a3d17'
 		this.context.font = '14px monospace'
-		this.context.fillText('> ENTER / ? SEE ACHIEVEMENTS <', 14, 246)
+		this.context.fillText('> ENTER BACK // ? ACHIEVEMENTS <', 14, 246)
 	}
 
 	private renderAchievements(): void {
@@ -475,6 +547,7 @@ export class Renderer {
 
 		this.context.textAlign = 'left'
 		this.context.textBaseline = 'top'
+		this.drawMenuRain()
 
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '22px monospace'
@@ -507,7 +580,75 @@ export class Renderer {
 
 		this.context.fillStyle = backHint ? '#33ff66' : '#0a3d17'
 		this.context.font = '14px monospace'
-		this.context.fillText('> ENTER / ? TO RETURN <', 14, 266)
+		this.context.fillText('> ENTER BACK // ? KEYS <', 14, 266)
+	}
+
+	private renderKeys(): void {
+		const awaiting = this.state.keysAwaiting
+		const backHint = Math.floor(Date.now() / 400) % 2 === 0
+		const zoomPercent = 100 + this.state.zoomIndex * 25
+
+		this.context.textAlign = 'left'
+		this.context.textBaseline = 'top'
+		this.drawMenuRain()
+
+		this.context.fillStyle = '#ffcc33'
+		this.context.font = '22px monospace'
+		this.context.fillText('KEYS // OPTIONS', 14, 20)
+
+		this.context.fillStyle = '#5a7a5a'
+		this.context.font = '10px monospace'
+		this.context.fillText(
+			'\u25B2 \u25BC SELECT // \u25C0 \u25B6 ZOOM // CONFIRM REMAP',
+			14,
+			50,
+		)
+
+		BINDABLE_ACTIONS.forEach((action, index) => {
+			const selected = index === this.state.keysIndex
+			const bound = this.state.bindings[action]
+			const display = keyName(bound ?? KEY_DEFAULT_LABELS[action])
+			const y = 72 + index * 18
+
+			this.context.fillStyle = selected ? '#33ff66' : '#00ffd0'
+			this.context.font = selected
+				? 'bold 12px monospace'
+				: '12px monospace'
+			this.context.fillText(
+				`${bound ? '*' : ' '}${selected ? '>' : ' '} ${
+					KEY_ACTION_LABELS[action]
+				}`,
+				24,
+				y,
+			)
+
+			this.context.fillStyle = bound ? '#ffcc33' : '#5a7a5a'
+			this.context.textAlign = 'right'
+			this.context.fillText(display, CANVAS_WIDTH - 24, y)
+			this.context.textAlign = 'left'
+		})
+
+		this.context.fillStyle = '#00ffd0'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`TERMINAL ZOOM: ${zoomPercent}%   [\u25C0 \u25B6]`,
+			24,
+			222,
+		)
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '12px monospace'
+		this.context.fillText('* = CUSTOM BIND SAVED', 24, 232)
+
+		this.context.fillStyle = backHint ? '#33ff66' : '#0a3d17'
+		this.context.font = '14px monospace'
+		this.context.fillText(
+			awaiting
+				? '> PRESS A KEY... (ESC CANCEL) <'
+				: '> CONFIRM REMAP // ? BACK <',
+			14,
+			250,
+		)
 	}
 
 	private renderPlayer(): void {
@@ -542,6 +683,7 @@ export class Renderer {
 	private renderTitle(): void {
 		this.context.textAlign = 'left'
 		this.context.textBaseline = 'top'
+		this.drawMenuRain()
 
 		const prompt = Math.floor(Date.now() / 500) % 2 === 0
 
@@ -553,14 +695,14 @@ export class Renderer {
 
 		this.context.fillStyle = '#00ffd0'
 		this.context.font = '12px monospace'
-		this.context.fillText('DECRYPT THE VAULT // v1.0', 14, 52)
+		this.context.fillText('DECRYPT THE VAULT // v2.0', 14, 52)
 
 		this.context.fillStyle = '#33ff66'
 		this.context.font = '12px monospace'
-		this.context.fillText('COLLECT ALL BITS OR REACH THE EXIT', 14, 84)
+		this.context.fillText('COLLECT BITS: +10 EA × COMBO', 14, 84)
 		this.context.fillText('ANTIVIRUS (+) SCARES THE DAEMONS', 14, 102)
 		this.context.fillText('* FREEZE // 1 EXTRA LIFE // T WARP', 14, 120)
-		this.context.fillText('SESSION 1 PATROL // HUNTING FROM S2', 14, 138)
+		this.context.fillText('REACH THE EXIT TO DECRYPT THE VAULT', 14, 138)
 		this.context.fillText('HUNTER (ORANGE) APPEARS SESSION 3', 14, 156)
 
 		this.context.fillStyle = prompt ? '#33ff66' : '#0a3d17'
@@ -569,7 +711,7 @@ export class Renderer {
 
 		this.context.fillStyle = '#5a7a5a'
 		this.context.font = '10px monospace'
-		this.context.fillText('P PAUSE // M MUTE // PAD // ? HELP+ACHEV', 14, 192)
+		this.context.fillText('P PAUSE // M MUTE // PAD // ? MENUS', 14, 192)
 
 		const blinkLine = Math.floor(Date.now() / 500) % 2 === 0
 
@@ -598,6 +740,14 @@ export class Renderer {
 		this.context.fillStyle = '#ffcc33'
 		this.context.font = '12px monospace'
 		this.context.fillText(`HI-SCORE ${pad(this.state.hiScore)}`, 14, 238)
+
+		this.context.fillStyle = '#33ff66'
+		this.context.font = '12px monospace'
+		this.context.fillText(
+			`PLAYERS ${this.state.playerCount}   [1 / 2]`,
+			14,
+			250,
+		)
 	}
 
 	private renderVictory(): void {
@@ -611,7 +761,7 @@ export class Renderer {
 		this.context.fillStyle = '#fff'
 		this.context.font = '10px monospace'
 		this.context.fillText(
-			`SCORE ${pad(this.state.score)}  //  SESSION ${pad2(this.state.session)}`,
+			`SCORE ${pad(Math.floor(this.state.scoreDisplay))}  //  SESSION ${pad2(this.state.session)}`,
 			Math.abs(CANVAS_WIDTH / 2),
 			106,
 		)
@@ -630,6 +780,7 @@ export class Renderer {
 	private renderGameOver(): void {
 		this.context.textAlign = 'left'
 		this.context.textBaseline = 'top'
+		this.drawMenuRain()
 
 		this.context.fillStyle = '#ff3333'
 		this.context.font = '22px monospace'
@@ -638,15 +789,24 @@ export class Renderer {
 		let y = 58
 
 		if (this.state.hsEntry) {
+			this.context.fillStyle = '#33ff66'
+			this.context.font = '14px monospace'
+			this.context.fillText(
+				`SCORE ${pad(Math.floor(this.state.scoreDisplay))}`,
+				14,
+				y,
+			)
+			y += 18
+
 			this.context.fillStyle = '#ffcc33'
 			this.context.font = '14px monospace'
 			this.context.fillText('NEW HI-SCORE!', 14, y)
-			y += 22
+			y += 18
 
 			this.context.fillStyle = '#33ff66'
 			this.context.font = '10px monospace'
 			this.context.fillText('ENTER YOUR NAME:', 14, y)
-			y += 18
+			y += 16
 
 			this.context.font = '24px monospace'
 			this.context.fillStyle = '#ffffff'
@@ -662,7 +822,13 @@ export class Renderer {
 		} else if (!this.state.demo) {
 			this.context.fillStyle = '#5a7a5a'
 			this.context.font = '10px monospace'
-			this.context.fillText('PRESS ENTER FOR TITLES', 14, y)
+			this.context.fillText(
+				this.state.playerCount === 2 && this.state.currentPlayer === 1
+					? 'PRESS ENTER FOR PLAYER 2'
+					: 'PRESS ENTER FOR TITLES',
+				14,
+				y,
+			)
 		}
 
 		y += 56
@@ -680,8 +846,36 @@ export class Renderer {
 				`${index + 1}. ${entry.name} ${pad(entry.score)}`,
 				14,
 				y + index * 17,
-			)
+)
 		})
+
+		if (
+			this.state.playerCount === 2 &&
+			this.state.currentPlayer === 2 &&
+			!this.state.demo
+		) {
+			const playerOne = this.state.playerScores[0]
+			const playerTwo = this.state.score
+			const winner =
+				playerOne > playerTwo
+					? 'PLAYER 1 WINS!'
+					: playerTwo > playerOne
+						? 'PLAYER 2 WINS!'
+						: 'DRAW!'
+			const after = y + this.state.scores.length * 17
+
+			this.context.fillStyle = '#00ffd0'
+			this.context.font = '12px monospace'
+			this.context.fillText(
+				`P1 ${pad(playerOne)}  P2 ${pad(playerTwo)}`,
+				14,
+				after,
+			)
+
+			this.context.fillStyle = '#ffcc33'
+			this.context.font = '12px monospace'
+			this.context.fillText(winner, 14, after + 16)
+		}
 	}
 
 	renderPath(path: Point[]): void {

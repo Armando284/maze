@@ -12,18 +12,28 @@ const TICK_INTERVAL = 25
 export class Audio {
 	private context: AudioContext | null = null
 	private output: GainNode | null = null
+	private analyser: AnalyserNode | null = null
 	private muted = false
 	private musicPlaying = false
 	private musicStep = 0
 	private nextNoteTime = 0
 	private ticker = 0
+	private tempo = 1
 
 	get isMuted(): boolean {
 		return this.muted
 	}
 
+	setTempo(factor: number): void {
+		this.tempo = factor
+	}
+
 	setMuted(muted: boolean): void {
 		this.muted = muted
+	}
+
+	waveform(data: Uint8Array<ArrayBuffer>): void {
+		this.analyser?.getByteTimeDomainData(data)
 	}
 
 	unlock(): void {
@@ -72,7 +82,7 @@ export class Audio {
 		while (this.nextNoteTime < context.currentTime + 0.12) {
 			this.playStep(this.musicStep, this.nextNoteTime)
 			this.musicStep = (this.musicStep + 1) % MELODY.length
-			this.nextNoteTime += MUSIC_STEP
+			this.nextNoteTime += MUSIC_STEP * this.tempo
 		}
 	}
 
@@ -110,7 +120,11 @@ export class Audio {
 			this.context = new AudioContextCtor()
 			this.output = this.context.createGain()
 			this.output.gain.value = 0.06
-			this.output.connect(this.context.destination)
+			this.analyser = this.context.createAnalyser()
+			this.analyser.fftSize = 256
+			this.analyser.smoothingTimeConstant = 0.65
+			this.output.connect(this.analyser)
+			this.analyser.connect(this.context.destination)
 		}
 
 		if (this.context.state === 'suspended') {
@@ -161,6 +175,12 @@ export class Audio {
 		this.tone(660, 0.05)
 		this.tone(990, 0.07, 0.05)
 	}
+bit(combo: number): void {
+		const frequency = 480 + combo * 140
+
+		this.tone(frequency, 0.04)
+		this.tone(frequency * 1.5, 0.03, 0.04)
+	}
 
 	power(): void {
 		this.tone(440, 0.08)
@@ -192,6 +212,16 @@ export class Audio {
 		this.tone(660, 0.1, 0.08)
 		this.tone(440, 0.12, 0.16)
 		this.tone(880, 0.14, 0.28)
+	}
+
+	bootJingle(): void {
+		this.tone(392, 0.09)
+		this.tone(523.25, 0.09, 0.09)
+		this.tone(659.25, 0.09, 0.18)
+		this.tone(783.99, 0.14, 0.27)
+		this.tone(1046.5, 0.24, 0.41)
+		this.tone(783.99, 0.14, 0.65)
+		this.tone(659.25, 0.2, 0.79)
 	}
 
 	victory(): void {

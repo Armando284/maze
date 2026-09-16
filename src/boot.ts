@@ -1,16 +1,47 @@
 const AUTO_START_DELAY = 1800
 
-const BOOT_LINES = [
-	'MAZE.EXE - PHOSPHOR TERMINAL v1.0',
-	'',
-	'MEMORY CHECK .............. OK',
-	'LOADING VAULT GENERATOR ... OK',
-	'DAEMON SERVICES ........... 5 ACTIVE',
-	'GLITCH ENTITY ............. WARN',
-	'ACOUSTIC CHANNEL .......... STANDBY',
-	'',
-	'PRESS ANY KEY OR AUTO-BOOT',
+const BOOT_TEMPLATES = [
+	[
+		'MAZE.EXE - PHOSPHOR TERMINAL v2.0',
+		'',
+		'MEMORY CHECK .............. OK',
+		'LOADING VAULT GENERATOR ... OK',
+		'DAEMON SERVICES ........... 5 ACTIVE',
+		'GLITCH ENTITY ............. WARN',
+		'ACOUSTIC CHANNEL .......... STANDBY',
+	],
+	[
+		'MAZE.EXE v2.0 // RIG-BIOS 2.5',
+		'',
+		'ROM CHECK ......... 64K OK',
+		'VECTOR LOAD ....... CALIBRATED',
+		'BITS .............. 65,536 SEEDED',
+		'P4 THREAT .......... DETECTED',
+		'KEYBOARD ........... UNLOCKED',
+	],
+	[
+		'MAZE.EXE v2.0 // NETRUNNER',
+		'',
+		'UPLINK ............ 300 BAUD',
+		'PASSWORD ............... OK',
+		'DECRYPT VAULT ......... 98%',
+		'POWER SURGE ......... WARN',
+		'SCANNER .............. ACTIVE',
+	],
 ]
+
+function pickBootTemplate(): string[] {
+	const index = Math.floor(Math.random() * BOOT_TEMPLATES.length)
+	const template = BOOT_TEMPLATES[index] ?? []
+
+	return [
+		...template,
+		'',
+		'PRESS ANY KEY OR AUTO-BOOT',
+	]
+}
+
+const BOOT_LINES = pickBootTemplate()
 
 export class Boot {
 	private readonly overlay: HTMLElement

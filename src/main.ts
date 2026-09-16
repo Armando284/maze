@@ -1,6 +1,7 @@
 import './style.css'
 import { Game } from './game'
 import { Boot } from './boot'
+import { Visualizer } from './visualizer'
 import { CELL_SIZE } from './grid'
 import { MAZE_HEIGHT, MAZE_WIDTH } from './maze'
 
@@ -25,5 +26,8 @@ const boot = new Boot()
 
 boot.start(() => {
 	game.unlockAudio()
+	game.playBootJingle()
 	game.start()
+
+	new Visualizer(game.getAudio()).start()
 })

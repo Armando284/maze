@@ -6,8 +6,22 @@ export type GameStatus =
 	| 'gameover'
 	| 'help'
 	| 'achievements'
+	| 'keys'
 
 export type Difficulty = 'easy' | 'normal' | 'ranked'
+
+export const BINDABLE_ACTIONS = [
+	'up',
+	'down',
+	'left',
+	'right',
+	'action',
+	'pause',
+	'help',
+	'mute',
+] as const
+
+export type KeyAction = (typeof BINDABLE_ACTIONS)[number]
 
 export interface PlayStats {
 	bits: number
@@ -50,10 +64,12 @@ export interface Particle {
 
 export interface GameState {
 	status: GameStatus
+	playerCount: 1 | 2
+	currentPlayer: 1 | 2
+	playerScores: [number, number]
 	score: number
 	hiScore: number
 	session: number
-	dots: number
 	fright: number
 	freeze: number
 	lives: number
@@ -66,9 +82,16 @@ export interface GameState {
 	unlocked: string[]
 	lostLifeThisSession: boolean
 	achieveToast: AchievementToast | null
+	bindings: Partial<Record<KeyAction, string>>
+	keysIndex: number
+	keysAwaiting: boolean
+	zoomIndex: number
 	introTimer: number
 	deathTimer: number
 	shake: number
+	combo: number
+	comboTimer: number
+	scoreDisplay: number
 	demo: boolean
 	demoTimer: number
 	popups: Popup[]
