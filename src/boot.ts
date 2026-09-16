@@ -1,3 +1,5 @@
+const AUTO_START_DELAY = 1800
+
 const BOOT_LINES = [
 	'MAZE.EXE - PHOSPHOR TERMINAL v1.0',
 	'',
@@ -7,7 +9,7 @@ const BOOT_LINES = [
 	'GLITCH ENTITY ............. WARN',
 	'ACOUSTIC CHANNEL .......... STANDBY',
 	'',
-	'PRESS ANY KEY TO RAID',
+	'PRESS ANY KEY OR AUTO-BOOT',
 ]
 
 export class Boot {
@@ -17,7 +19,7 @@ export class Boot {
 	private lineIndex = 0
 	private charIndex = 0
 	private timer = 0
-	private ready = false
+	private done = false
 
 	constructor() {
 		const overlay = document.getElementById('boot')
@@ -56,14 +58,15 @@ export class Boot {
 			return
 		}
 
-		this.ready = true
+		this.timer = window.setTimeout(this.finish, AUTO_START_DELAY)
 	}
 
-	private handleKeyDown = (event: KeyboardEvent): void => {
-		if (!this.ready) {
+	private finish = (): void => {
+		if (this.done) {
 			return
 		}
 
+		this.done = true
 		window.removeEventListener('keydown', this.handleKeyDown)
 		window.clearTimeout(this.timer)
 
@@ -73,5 +76,13 @@ export class Boot {
 			this.overlay.remove()
 			this.onComplete?.()
 		}, 320)
+	}
+
+	private handleKeyDown = (): void => {
+		if (this.done) {
+			return
+		}
+
+		this.finish()
 	}
 }

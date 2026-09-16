@@ -552,6 +552,8 @@ export class Game {
 
 		switch (this.state.status) {
 			case 'title':
+				this.state.demoTimer = 0
+
 				if (isHelpKey(event.key)) {
 					this.state.status = 'help'
 					return
